@@ -110,10 +110,7 @@ def fetch_view_data(table_id, view_id):
     # 步骤 C：清洗并转换为 DataFrame
     fields_list = [r.get("fields", {}) for r in all_records]
     df = pd.DataFrame(fields_list)
-    if hasattr(df, "map"):
     df = df.map(clean_cell_value)
-else:
-    df = df.applymap(clean_cell_value)
     return df
 
 # 5. 网页前端布局渲染
