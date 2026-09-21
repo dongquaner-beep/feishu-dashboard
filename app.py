@@ -5,8 +5,13 @@ import pandas as pd
 import json
 import base64
 
-# 1. 页面基本配置
-st.set_page_config(page_title="全球技术服务中心周报", layout="wide", page_icon="📊")
+# 1. 页面基本设置（默认展开左侧导航栏）
+st.set_page_config(
+    page_title="全球技术服务中心周报",
+    layout="wide",
+    page_icon="📊",
+    initial_sidebar_state="expanded"
+)
 
 # 2. 飞书凭据与多表多视图配置
 APP_ID = "cli_aa2529e038f81be3"
@@ -37,9 +42,10 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入完整 UI 样式
+# 3. 注入全局与左侧侧边栏样式
 render_html("""
 <style>
+/* 全局背景与字体 */
 .stApp {
     background: radial-gradient(60% 52% at 12% 8%,rgba(99,102,241,.16),transparent 70%),
                 radial-gradient(55% 46% at 90% 6%,rgba(56,189,248,.15),transparent 70%),
@@ -49,18 +55,123 @@ render_html("""
     font-family: 'PingFang SC','SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     color: #1E293B;
 }
-.report-header {
-    font-size: 30px;
+
+/* 侧边栏整体毛玻璃美化 */
+[data-testid="stSidebar"] {
+    background: rgba(255, 255, 255, 0.88) !important;
+    border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
+    backdrop-filter: blur(22px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.06) !important;
+}
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+    padding: 24px 14px !important;
+}
+
+/* 侧边栏标题渐变 */
+.sidebar-title {
+    font-size: 21px;
     font-weight: 800;
-    margin-bottom: 20px;
+    letter-spacing: 0.5px;
+    margin-bottom: 22px;
+    padding: 0 8px;
+    background: linear-gradient(120deg,#4338CA,#0284C7 50%,#7C3AED);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    display: block;
+}
+
+/* 侧边栏单选导航改造成胶囊按钮 (.nav-item) */
+[data-testid="stSidebar"] div[data-testid="stRadio"] > div {
+    gap: 8px !important;
+}
+[data-testid="stSidebar"] div[data-testid="stRadio"] label {
+    padding: 12px 16px !important;
+    border-radius: 14px !important;
+    background: transparent !important;
+    color: #334155 !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    margin: 0 !important;
+    border: none !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+}
+[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child {
+    display: none !important; /* 隐藏原生圆形选择框 */
+}
+[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {
+    background: #F1F5F9 !important;
+    color: #1E1B4B !important;
+}
+/* 选中项高亮渐变 */
+[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"],
+[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) {
+    color: #ffffff !important;
+    background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
+    box-shadow: 0 8px 20px rgba(67, 56, 202, 0.32) !important;
+}
+[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"] p,
+[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) p {
+    color: #ffffff !important;
+    font-weight: 800 !important;
+}
+
+/* 顶部大标题 */
+.report-header {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 8px;
     background: linear-gradient(120deg,#4338CA,#0284C7 50%,#7C3AED);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     display: inline-block;
 }
+
+/* 统一轻量数量提示 */
+.tab-summary-badge {
+    font-size: 15px;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 悬浮刷新按钮 (FAB 胶囊) */
+button[kind="primary"] {
+    position: fixed !important;
+    bottom: 60px !important;
+    right: 28px !important;
+    z-index: 99999 !important;
+    border-radius: 99px !important;
+    padding: 8px 16px !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.38) !important;
+    backdrop-filter: blur(10px) !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    width: auto !important;
+}
+button[kind="primary"]:hover {
+    transform: translateY(-2px) scale(1.03) !important;
+    box-shadow: 0 12px 26px rgba(79, 70, 229, 0.5) !important;
+    background: linear-gradient(135deg, #4338CA, #1D4ED8) !important;
+}
+
+/* 卡片系统与排版 */
 .section-title {
-    font-size: 24px;
+    font-size: 23px;
     font-weight: 800;
     padding-bottom: 10px;
     margin: 32px 0 18px;
@@ -174,7 +285,7 @@ render_html("""
 </style>
 """)
 
-# 4. 字段清洗与辅助函数
+# 4. 数据拉取与字段清洗
 def clean_cell_value(val):
     if val is None:
         return ""
@@ -274,7 +385,6 @@ def find_column(df, candidates):
                 return col
     return None
 
-# 尝试抓取图片并转 Base64，防止飞书 CDN 防盗链导致浏览器加载失败
 @st.cache_data(ttl=3600)
 def to_base64_image(img_url):
     if not img_url or not str(img_url).startswith("http"):
@@ -300,23 +410,19 @@ def extract_image_url(row, p_title=""):
         return to_base64_image(default_workorder_img)
     return None
 
-# 解析表格 3（部门非交付事项）精准锁定【负责小组】与【进度及关注事项】
+# 解析表格 3（部门非交付事项）
 def parse_non_delivery_data(df):
     if df.empty:
         return {}
-    
     col_grp = find_column(df, ["负责小组", "小组", "部门", "负责部门", "团队", "组别"])
     col_cnt = find_column(df, ["进度及关注事项", "本周进度及关注事项", "关注事项", "事项内容", "工作内容", "部门事项汇总", "非交付事项"])
-    
     res = {}
     for _, r in df.iterrows():
         g_raw = r.get(col_grp) if col_grp else ""
         g = normalize_group_name(g_raw)
-        
         c_raw = r.get(col_cnt) if col_cnt else ""
         if not c_raw and "进度及关注事项" in r:
             c_raw = r.get("进度及关注事项")
-            
         c_clean = fmt_txt(c_raw)
         if g and c_clean and c_clean != "-":
             if g in res:
@@ -325,17 +431,15 @@ def parse_non_delivery_data(df):
                 res[g] = c_clean
     return res
 
-# 解析表格 4（接诉即办专项分析）动态图表与落实方案
+# 解析表格 4（接诉即办专项分析）
 def parse_complaint_data(df):
     if df.empty:
         return [], []
-    
     col_month = find_column(df, ["统计月份", "月份", "统计月份-区域"])
     col_area = find_column(df, ["区域", "地区"])
     col_total = find_column(df, ["客诉总单数", "总单数", "总数"])
     col_plan = find_column(df, ["改进方案落实情况", "落实情况", "改进方案", "方案", "整改方案"])
     
-    # 动态匹配所有带“问题”或“归类-”的问题分类列
     cat_cols = []
     for col in df.columns:
         if col in [col_month, col_area, col_total, col_plan]:
@@ -345,11 +449,9 @@ def parse_complaint_data(df):
             
     chart_list = []
     plans = []
-    
     for _, r in df.iterrows():
         name = str(r.get(col_month) or r.get(col_area) or "客诉分析").strip()
         area_name = str(r.get(col_area) or r.get(col_month) or "").strip()
-        
         try:
             total = int(float(str(r.get(col_total, 0) or 0).strip()))
         except Exception:
@@ -369,50 +471,41 @@ def parse_complaint_data(df):
             total = sum(x["value"] for x in cats)
             
         if cats or total > 0:
-            chart_list.append({
-                "name": name,
-                "total": total,
-                "cats": cats
-            })
+            chart_list.append({"name": name, "total": total, "cats": cats})
             
         if col_plan:
             p_txt = str(r.get(col_plan, "")).strip()
             display_area = name if name else area_name
-            plans.append({
-                "area": display_area,
-                "plan": fmt_txt(p_txt) if p_txt else "暂无记录"
-            })
+            plans.append({"area": display_area, "plan": fmt_txt(p_txt) if p_txt else "暂无记录"})
             
     return chart_list, plans
 
-# 5. 顶部操作栏
-col_title, col_btn = st.columns([5, 1])
-with col_title:
-    render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
-with col_btn:
-    if st.button("🔄 刷新最新数据", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
+# ----------------- 5. 左侧侧边栏导航 -----------------
+with st.sidebar:
+    render_html('<span class="sidebar-title">GTS 周会汇报</span>')
+    selected_tab = st.radio(
+        "导航选择",
+        options=["📦 交付中项目", "🔧 运维中项目", "🏁 已完结/挂起项目", "📑 其他事项汇总"],
+        label_visibility="collapsed"
+    )
 
-tab1, tab2, tab3, tab4 = st.tabs(["📦 交付中项目", "🔧 运维中项目", "🏁 已完结/挂起项目", "📑 其他事项汇总"])
+# ----------------- 6. 右下角常驻悬浮刷新按钮 -----------------
+if st.button("🔄 刷新数据", type="primary"):
+    st.cache_data.clear()
+    st.rerun()
+
+# 页面顶部标题
+render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
 
 # ==================== Tab 1：交付中项目 ====================
-with tab1:
+if selected_tab == "📦 交付中项目":
     with st.spinner("正在拉取【交付中项目】..."):
         df_del = fetch_feishu_view(TABLE_LIFE_ID, VIEW_DELIVERY)
     if df_del.empty:
         st.info("暂未获取到交付中项目数据。")
     else:
-        kpi1, kpi2, kpi3 = st.columns(3)
-        kpi1.metric("交付事项总数", f"{len(df_del)} 项")
-        avg_num = 0
-        if "完成进度" in df_del.columns:
-            nums = [fmt_progress(x)[0] for x in df_del["完成进度"]]
-            avg_num = round(sum(nums) / len(nums), 1) if nums else 0
-        kpi2.metric("整体平均完成进度", f"{avg_num}%")
-        bu_cnt = df_del["BU"].nunique() if "BU" in df_del.columns else 1
-        kpi3.metric("涉及业务板块", f"{bu_cnt} 个")
-        st.write("")
+        # 极简数量统计行
+        render_html(f'<div class="tab-summary-badge">共计 <strong>{len(df_del)}</strong> 个交付中项目</div>')
         
         cards_html = ['<div class="card-stack">']
         for _, row in df_del.iterrows():
@@ -461,6 +554,7 @@ with tab1:
         cards_html.append('</div>')
         render_html("\n".join(cards_html))
         
+        # 底部进度说明对照表
         render_html("""
         <div class="card" style="max-width:760px;margin:32px auto 10px;">
             <div class="card-title" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">“项目完成进度”说明</div>
@@ -480,17 +574,14 @@ with tab1:
         """)
 
 # ==================== Tab 2：运维中项目 ====================
-with tab2:
+elif selected_tab == "🔧 运维中项目":
     with st.spinner("正在拉取【运维中项目】..."):
         df_maint = fetch_feishu_view(TABLE_LIFE_ID, VIEW_MAINT)
     if df_maint.empty:
         st.info("暂无运维中项目。")
     else:
-        m_kpi1, m_kpi2 = st.columns(2)
-        m_kpi1.metric("在保运维项目总数", f"{len(df_maint)} 项")
-        m_bu_cnt = df_maint["BU"].nunique() if "BU" in df_maint.columns else 1
-        m_kpi2.metric("涉及业务板块", f"{m_bu_cnt} 个")
-        st.write("")
+        render_html(f'<div class="tab-summary-badge">共计 <strong>{len(df_maint)}</strong> 个在保运维项目</div>')
+        
         maint_cards = ['<div class="card-stack">']
         for _, row in df_maint.iterrows():
             p_name = row.get("项目名称") or "未命名项目"
@@ -521,14 +612,14 @@ with tab2:
         render_html("\n".join(maint_cards))
 
 # ==================== Tab 3：已完结/挂起项目 ====================
-with tab3:
+elif selected_tab == "🏁 已完结/挂起项目":
     with st.spinner("正在拉取【已完结/挂起项目】..."):
         df_fin = fetch_feishu_view(TABLE_LIFE_ID, VIEW_FINISH)
     if df_fin.empty:
         st.info("暂无已完结或挂起项目。")
     else:
-        st.markdown(f"**共计 {len(df_fin)} 个已完结或挂起项目**")
-        st.write("")
+        render_html(f'<div class="tab-summary-badge">共计 <strong>{len(df_fin)}</strong> 个已完结或挂起项目</div>')
+        
         fin_cards = ['<div class="card-stack">']
         for _, row in df_fin.iterrows():
             p_name = row.get("项目名称") or "未命名项目"
@@ -549,24 +640,17 @@ with tab3:
         fin_cards.append('</div>')
         render_html("\n".join(fin_cards))
 
-# ==================== Tab 4：其他事项汇总（动态聚合） ====================
-with tab4:
-    with st.spinner("正在从飞书子表实时同步最新数据..."):
-        # 拉取表格 2：自研产品与重点专项
+# ==================== Tab 4：其他事项汇总 ====================
+elif selected_tab == "📑 其他事项汇总":
+    with st.spinner("正在从飞书动态同步子表最新数据..."):
         df_p = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_PROD)
         df_s = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_SPEC)
         df_dev_all = pd.concat([df_p, df_s], ignore_index=True) if (not df_p.empty or not df_s.empty) else pd.DataFrame()
-        
-        # 拉取表格 3：部门非交付事项
         df_non_del = fetch_feishu_view(TABLE_NON_DEL_ID, VIEW_NON_DEL)
-        
-        # 拉取表格 4：接诉即办专项分析
         df_complaint = fetch_feishu_view(TABLE_COMPLAINT_ID, VIEW_COMPLAINT)
 
-    # 提取表格 3 部门事项汇总
     non_del_summary_map = parse_non_delivery_data(df_non_del)
 
-    # 识别表格 2 字段
     col_dev_name = find_column(df_dev_all, ["产品/专项名称", "产品名称", "专项名称", "名称"])
     col_dev_cat = find_column(df_dev_all, ["分类", "类别"])
     col_dev_cur = find_column(df_dev_all, ["本周进度与建设情况", "本周进度", "建设情况"])
@@ -578,11 +662,9 @@ with tab4:
     for grp in groups_order:
         render_html(f'<h2 class="section-title"><span class="grad-text">{grp}</span></h2>')
         
-        # 1. 交付研发二组：客诉问题分类统计 (接诉即办) 动态饼图与落实表
+        # 1. 交付研发二组：客诉问题饼图与落实表
         if grp == "交付研发二组":
             chart_list, plan_list = parse_complaint_data(df_complaint)
-            
-            # 若表格当前为空则提供默认海淀/昌平样例
             if not chart_list:
                 chart_list = [
                     {"name": "9月-海淀区", "total": 10, "cats": [{"name": "运维问题", "value": 1}, {"name": "设备问题", "value": 1}, {"name": "算法问题", "value": 8}]},
@@ -647,7 +729,6 @@ with tab4:
         grp_cards = ['<div class="card-stack">']
         has_content = False
 
-        # A. 自研产品与重点专项（表格 2）
         if not df_dev_all.empty and col_dev_group:
             matching_dev = df_dev_all[df_dev_all[col_dev_group].apply(normalize_group_name) == grp]
             for _, drow in matching_dev.iterrows():
@@ -671,7 +752,6 @@ with tab4:
                 </div>
                 """)
 
-        # B. 部门事项汇总（表格 3 动态获取）
         if grp in non_del_summary_map:
             has_content = True
             content_txt = non_del_summary_map[grp]
