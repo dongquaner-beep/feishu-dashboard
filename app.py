@@ -38,32 +38,34 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局样式与温和高亮样式
+# 3. 注入全局精细化字重与层级样式
 render_html("""
 <style>
+/* 全局微光渐变背景 */
 .stApp {
-    background: radial-gradient(60% 52% at 12% 8%,rgba(99,102,241,.16),transparent 70%),
-                radial-gradient(55% 46% at 90% 6%,rgba(56,189,248,.15),transparent 70%),
-                radial-gradient(58% 50% at 92% 92%,rgba(168,85,247,.15),transparent 70%),
-                radial-gradient(55% 46% at 6% 94%,rgba(59,130,246,.15),transparent 70%),
+    background: radial-gradient(60% 52% at 12% 8%,rgba(99,102,241,.14),transparent 70%),
+                radial-gradient(55% 46% at 90% 6%,rgba(56,189,248,.13),transparent 70%),
+                radial-gradient(58% 50% at 92% 92%,rgba(168,85,247,.13),transparent 70%),
+                radial-gradient(55% 46% at 6% 94%,rgba(59,130,246,.13),transparent 70%),
                 linear-gradient(135deg,#EEF2FF,#F5F8FF 46%,#FAF5FF) !important;
     font-family: 'PingFang SC','SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-    color: #1E293B;
+    color: #334155;
 }
 
+/* 侧边栏毛玻璃 */
 [data-testid="stSidebar"] {
     background: rgba(255, 255, 255, 0.88) !important;
     border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
     backdrop-filter: blur(22px) saturate(180%) !important;
     -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
-    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.06) !important;
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.05) !important;
 }
 [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
     padding: 24px 14px !important;
 }
 .sidebar-title {
-    font-size: 21px;
-    font-weight: 800;
+    font-size: 20px;
+    font-weight: 700;
     letter-spacing: 0.5px;
     margin-bottom: 22px;
     padding: 0 8px;
@@ -74,6 +76,7 @@ render_html("""
     display: block;
 }
 
+/* 侧边栏菜单胶囊 */
 [data-testid="stSidebar"] div[data-testid="stRadio"] > div {
     gap: 8px !important;
 }
@@ -81,9 +84,9 @@ render_html("""
     padding: 12px 16px !important;
     border-radius: 14px !important;
     background: transparent !important;
-    color: #334155 !important;
-    font-size: 16px !important;
-    font-weight: 700 !important;
+    color: #475569 !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
     margin: 0 !important;
@@ -103,18 +106,19 @@ render_html("""
 [data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) {
     color: #ffffff !important;
     background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
-    box-shadow: 0 8px 20px rgba(67, 56, 202, 0.32) !important;
+    box-shadow: 0 8px 18px rgba(67, 56, 202, 0.28) !important;
 }
 [data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"] p,
 [data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) p {
     color: #ffffff !important;
-    font-weight: 800 !important;
+    font-weight: 600 !important;
 }
 
+/* 页面顶部标题与轻量统计信息 */
 .report-header {
-    font-size: 28px;
-    font-weight: 800;
-    margin-bottom: 8px;
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 6px;
     background: linear-gradient(120deg,#4338CA,#0284C7 50%,#7C3AED);
     -webkit-background-clip: text;
     background-clip: text;
@@ -122,15 +126,20 @@ render_html("""
     display: inline-block;
 }
 .tab-summary-badge {
-    font-size: 15px;
-    font-weight: 700;
-    color: #475569;
+    font-size: 14px;
+    font-weight: 400;
+    color: #64748B;
     margin-bottom: 20px;
     display: inline-flex;
     align-items: center;
     gap: 6px;
 }
+.tab-summary-badge strong {
+    font-weight: 600;
+    color: #1E293B;
+}
 
+/* 悬浮刷新胶囊 */
 button[kind="primary"] {
     position: fixed !important;
     bottom: 45px !important;
@@ -139,26 +148,26 @@ button[kind="primary"] {
     border-radius: 99px !important;
     padding: 8px 18px !important;
     font-size: 13px !important;
-    font-weight: 700 !important;
+    font-weight: 600 !important;
     background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
     color: #ffffff !important;
     border: 1px solid rgba(255, 255, 255, 0.5) !important;
-    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.38) !important;
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35) !important;
     backdrop-filter: blur(10px) !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
     width: auto !important;
 }
 button[kind="primary"]:hover {
-    transform: translateY(-2px) scale(1.03) !important;
-    box-shadow: 0 12px 26px rgba(79, 70, 229, 0.5) !important;
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 10px 24px rgba(79, 70, 229, 0.45) !important;
     background: linear-gradient(135deg, #4338CA, #1D4ED8) !important;
 }
 
-/* 🎯 重点汇报行温和聚焦样式（蓝紫调，与红色风险项区隔） */
+/* 🎯 重点汇报行：柔和蓝紫微光背景，字重平实不刺眼 */
 .target-highlight {
     color: #3730A3 !important;
-    font-weight: 700 !important;
+    font-weight: 500 !important;
     background: #EEF2FF !important;
     border: 1px solid #C7D2FE !important;
     border-left: 4px solid #6366F1 !important;
@@ -166,35 +175,34 @@ button[kind="primary"]:hover {
     margin: 4px 0 !important;
     border-radius: 6px !important;
     display: inline-block !important;
-    box-shadow: 0 1px 4px rgba(99, 102, 241, 0.08) !important;
-    line-height: 1.6 !important;
+    line-height: 1.65 !important;
 }
 .risk-text .target-highlight {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    box-shadow: none !important;
 }
 
+/* 汇报模块大标题 */
 .section-title {
-    font-size: 23px;
-    font-weight: 800;
-    padding-bottom: 10px;
-    margin: 32px 0 18px;
+    font-size: 22px;
+    font-weight: 700;
+    padding-bottom: 8px;
+    margin: 30px 0 16px;
     position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
 }
-.section-title:first-child { margin-top: 6px; }
+.section-title:first-child { margin-top: 4px; }
 .section-title::after {
     content: '';
     position: absolute;
     left: 0;
     bottom: 0;
-    width: 72px;
-    height: 4px;
-    border-radius: 4px;
+    width: 64px;
+    height: 3px;
+    border-radius: 3px;
     background: linear-gradient(90deg,#4F46E5,#0284C7);
 }
 .grad-text {
@@ -203,55 +211,64 @@ button[kind="primary"]:hover {
     background-clip: text;
     color: transparent;
 }
-.card-stack { display: flex; flex-direction: column; gap: 22px; }
+
+/* 卡片排版 */
+.card-stack { display: flex; flex-direction: column; gap: 20px; }
 .card {
     position: relative;
-    padding: 24px 28px;
-    border-radius: 20px;
-    background: rgba(255,255,255,.88);
+    padding: 22px 26px;
+    border-radius: 18px;
+    background: rgba(255,255,255,.9);
     border: 1px solid rgba(255,255,255,.95);
-    backdrop-filter: blur(22px) saturate(180%);
-    -webkit-backdrop-filter: blur(22px) saturate(180%);
-    box-shadow: 0 10px 30px rgba(15,23,42,.06);
-    transition: transform .25s ease, box-shadow .25s ease;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: 0 8px 26px rgba(15,23,42,.05);
+    transition: transform .2s ease, box-shadow .2s ease;
 }
-.card:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(15,23,42,.1); }
+.card:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(15,23,42,.08); }
+
+/* 项目标题加粗突出 */
 .card-title {
-    font-size: 22px;
-    font-weight: 800;
+    font-size: 20px;
+    font-weight: 700;
     color: #0F172A;
-    margin: 0 0 16px;
+    margin: 0 0 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    padding-bottom: 12px;
+    padding-bottom: 10px;
     border-bottom: 1px solid #E2E8F0;
 }
 .product-title {
-    font-size: 23px;
-    font-weight: 800;
+    font-size: 21px;
+    font-weight: 700;
     background: linear-gradient(120deg,#4338CA,#0284C7);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
 }
-.block-title { margin: 0 0 18px; font-size: 22px; font-weight: 800; color: #0F172A; }
+.block-title { margin: 0 0 16px; font-size: 20px; font-weight: 700; color: #0F172A; }
+
+/* 胶囊标签降重 */
 .tag {
     display: inline-block;
-    padding: 3px 12px;
-    font-size: 14px;
-    font-weight: 700;
+    padding: 2px 10px;
+    font-size: 13px;
+    font-weight: 500;
     border-radius: 99px;
-    color: #312E81;
+    color: #3730A3;
     background: #EEF2FF;
     border: 1px solid #C7D2FE;
 }
 .tag-success { color: #065F46; background: #ECFDF5; border-color: #A7F3D0; }
-.tag-muted { color: #334155; background: #F1F5F9; border-color: #CBD5E1; }
-.progress-wrapper { margin: 16px 0 12px; }
-.progress-header { display: flex; justify-content: space-between; font-size: 16px; font-weight: 800; color: #1E293B; margin-bottom: 8px; }
-.progress-bg { width: 100%; height: 12px; border-radius: 99px; background: #E2E8F0; box-shadow: inset 0 2px 4px rgba(15,23,42,.1); overflow: hidden; }
+.tag-muted { color: #475569; background: #F1F5F9; border-color: #CBD5E1; }
+
+/* 进度条文字降重 */
+.progress-wrapper { margin: 14px 0 10px; }
+.progress-header { display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; color: #64748B; margin-bottom: 6px; }
+.progress-header span:last-child { font-weight: 600; color: #1E293B; }
+.progress-bg { width: 100%; height: 10px; border-radius: 99px; background: #E2E8F0; box-shadow: inset 0 2px 4px rgba(15,23,42,.08); overflow: hidden; }
 .progress-fill {
     height: 100%;
     border-radius: 99px;
@@ -262,32 +279,67 @@ button[kind="primary"]:hover {
     animation: flow 4s linear infinite;
 }
 @keyframes flow { to { background-position: 300% 0; } }
+
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
 @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
-.field-row { margin-bottom: 12px; font-size: 16px; line-height: 1.6; color: #1E293B; }
-.label { color: #3730A3; font-weight: 800; display: inline-block; margin-right: 6px; }
-.value { color: #1E293B; font-weight: 500; }
-.highlight-block { padding: 16px 18px; border-radius: 16px; background: rgba(248,250,252,.92); border: 1px solid #E2E8F0; border-left: 5px solid #6366F1; }
-.highlight-attention { border-color: #BFDBFE; border-left: 5px solid #1D4ED8; background: #EFF6FF; }
+
+/* 核心优化：正文字体全部转为常规 400，字段标签改为半粗 600 */
+.field-row {
+    margin-bottom: 12px;
+    font-size: 14.5px;
+    line-height: 1.7;
+    color: #334155;
+    font-weight: 400;
+}
+.label {
+    color: #4338CA;
+    font-weight: 600;
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 14.5px;
+}
+.value {
+    color: #334155;
+    font-weight: 400;
+    font-size: 14.5px;
+}
+
+/* 高亮区块排版 */
+.highlight-block { padding: 14px 16px; border-radius: 14px; background: rgba(248,250,252,.92); border: 1px solid #E2E8F0; border-left: 4px solid #6366F1; }
+.highlight-attention { border-color: #BFDBFE; border-left: 4px solid #2563EB; background: #F8FAFC; }
 .highlight-attention .label { color: #1D4ED8; }
-.highlight-plan { border-color: #BBF7D0; border-left: 5px solid #047857; background: #F0FDF4; }
+.highlight-plan { border-color: #BBF7D0; border-left: 4px solid #059669; background: #F8FCF9; }
 .highlight-plan .label { color: #047857; }
-.risk-text { display: block; margin-top: 6px; padding: 8px 12px; border-radius: 10px; color: #991B1B; font-weight: 700; font-size: 15px; line-height: 1.5; background: #FEE2E2; border: 1px solid #FCA5A5; }
+
+/* 风险文本专区 */
+.risk-text {
+    display: block;
+    margin-top: 6px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: #991B1B;
+    font-weight: 500;
+    font-size: 14.5px;
+    line-height: 1.6;
+    background: #FEE2E2;
+    border: 1px solid #FCA5A5;
+}
+
 .img-container img {
     width: 100%;
-    max-height: 480px;
+    max-height: 460px;
     object-fit: contain;
-    border-radius: 16px;
-    margin-top: 16px;
+    border-radius: 14px;
+    margin-top: 14px;
     border: 1px solid #E2E8F0;
-    box-shadow: 0 8px 24px rgba(15,23,42,.08);
+    box-shadow: 0 6px 20px rgba(15,23,42,.06);
     background: #fff;
 }
-.spec-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 14px; border-radius: 14px; overflow: hidden; border: 1px solid #E2E8F0; background: #fff; box-shadow: 0 6px 20px rgba(15,23,42,.04); }
-.spec-table th, .spec-table td { padding: 12px 18px; font-size: 15px; line-height: 1.6; border-bottom: 1px solid #E2E8F0; }
-.spec-table th { font-weight: 800; color: #1E1B4B; background: #EEF2FF; }
+.spec-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 14px; border-radius: 12px; overflow: hidden; border: 1px solid #E2E8F0; background: #fff; box-shadow: 0 4px 16px rgba(15,23,42,.03); }
+.spec-table th, .spec-table td { padding: 11px 16px; font-size: 14px; line-height: 1.6; border-bottom: 1px solid #E2E8F0; font-weight: 400; color: #334155; }
+.spec-table th { font-weight: 600; color: #1E1B4B; background: #EEF2FF; }
 .ct0 { border-bottom: 0 !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }
-.mt12 { margin-top: 12px; }
+.mt12 { margin-top: 10px; }
 </style>
 """)
 
@@ -569,7 +621,6 @@ if selected_tab == "📦 交付中项目":
     else:
         render_html(f'<div class="tab-summary-badge">共计 <strong>{len(df_del)}</strong> 个交付中项目</div>')
         
-        # 交付内容 取第二列，已完成事项 取标红第三列
         col_c_desc = find_column(df_del, ["交付内容", "交付范围", "建设内容", "内容"])
         col_c_done = find_column(df_del, ["已完成事项", "已完成工作", "已完成", "完成事项"])
         
@@ -743,7 +794,7 @@ elif selected_tab == "📑 其他事项汇总":
                 ]
 
             chart_json = json.dumps(chart_list, ensure_ascii=False)
-            table_rows_html = "".join([f"<tr><td style='font-weight:700;'>{safe_val(x['area'])}</td><td>{x['plan']}</td></tr>" for x in plan_list])
+            table_rows_html = "".join([f"<tr><td style='font-weight:600;'>{safe_val(x['area'])}</td><td>{x['plan']}</td></tr>" for x in plan_list])
 
             echarts_html = f"""
             <!DOCTYPE html><html><head><meta charset="utf-8"><script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
@@ -761,11 +812,11 @@ elif selected_tab == "📑 其他事项汇总":
                     ch.setOption({{
                         color: ['#4F46E5','#0284C7','#7C3AED','#E11D48','#F59E0B','#10B981','#64748B'],
                         tooltip: {{ trigger:'item', formatter:'{{b}}: {{c}} 单 ({{d}}%)' }},
-                        title: {{ text: item.name + '  共' + item.total + '单', left:'center', top:'43%', textStyle:{{ fontSize:18, fontWeight:800, color:'#0F172A' }} }},
+                        title: {{ text: item.name + '  共' + item.total + '单', left:'center', top:'43%', textStyle:{{ fontSize:17, fontWeight:600, color:'#0F172A' }} }},
                         series: [{{
                             type:'pie', radius:['42%','68%'], center:['50%','46%'], avoidLabelOverlap:true,
                             itemStyle:{{ borderRadius:6, borderColor:'#fff', borderWidth:2 }},
-                            label:{{ show:true, formatter:'{{b}}\\n{{c}} 单 ({{d}}%)', color:'#0F172A', fontWeight:700, fontSize:14 }},
+                            label:{{ show:true, formatter:'{{b}}\\n{{c}} 单 ({{d}}%)', color:'#0F172A', fontWeight:500, fontSize:13.5 }},
                             data: item.cats
                         }}]
                     }});
