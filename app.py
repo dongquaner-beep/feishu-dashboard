@@ -7,7 +7,7 @@ import json
 # 1. 页面基本设置
 st.set_page_config(page_title="全球技术服务中心周报", layout="wide", page_icon="📊")
 
-# 2. 飞书凭据与多表配置
+# 2. 飞书凭据与多表多视图配置
 APP_ID = "cli_aa2529e038f81be3"
 APP_SECRET = "gKBRXaqMIYKGGqc9RkyH0b11V4Dk4PSY"
 APP_TOKEN = "JqHKw49V3izuZKkm9s8ccGwNnmb"
@@ -31,7 +31,7 @@ VIEW_NON_DEL = "vewCXHSZWx"
 TABLE_COMPLAINT_ID = "tblGj9QwAXsYOOrn"
 VIEW_COMPLAINT = "vewiedoaqM"
 
-# 安全渲染 HTML 的辅助函数（消除缩进空格，防止被 Markdown 误识别为代码块）
+# 安全渲染 HTML 辅助函数
 def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
@@ -157,7 +157,7 @@ render_html("""
 .risk-text { display: block; margin-top: 6px; padding: 8px 12px; border-radius: 10px; color: #991B1B; font-weight: 700; font-size: 15px; line-height: 1.5; background: #FEE2E2; border: 1px solid #FCA5A5; }
 .img-container img {
     width: 100%;
-    max-height: 440px;
+    max-height: 460px;
     object-fit: contain;
     border-radius: 16px;
     margin-top: 16px;
@@ -177,18 +177,17 @@ render_html("""
 def clean_cell_value(val):
     if val is None:
         return ""
+    if isinstance(val, dict):
+        return val.get("link") or val.get("url") or val.get("text") or val.get("name") or ""
     if isinstance(val, list):
         texts = []
         for item in val:
             if isinstance(item, dict):
-                if "text" in item:
-                    texts.append(str(item["text"]))
-                elif "name" in item:
-                    texts.append(str(item["name"]))
-                elif "text_arr" in item and isinstance(item["text_arr"], list):
-                    texts.extend([str(t) for t in item["text_arr"] if t])
-                elif "url" in item:
-                    texts.append(str(item["url"]))
+                t = item.get("link") or item.get("url") or item.get("text") or item.get("name") or ""
+                if not t and "text_arr" in item and isinstance(item["text_arr"], list):
+                    t = " / ".join([str(x) for x in item["text_arr"] if x])
+                if t:
+                    texts.append(str(t))
             elif isinstance(item, (str, int, float)):
                 texts.append(str(item))
         return " / ".join(texts) if texts else ""
@@ -225,7 +224,6 @@ def fetch_feishu_view(table_id, view_id=None):
     if not all_records:
         return pd.DataFrame()
         
-    # 保留原始 fields 并做字符串清洗
     cleaned_rows = []
     for r in all_records:
         raw_f = r.get("fields", {})
@@ -252,7 +250,6 @@ def fmt_progress(val):
         return 0.0, "0%"
 
 def normalize_group_name(val):
-    """小组名称模糊对齐"""
     s = str(val).strip() if val else ""
     if "客服" in s or "客户" in s:
         return "客户服务组"
@@ -267,7 +264,6 @@ def normalize_group_name(val):
     return s
 
 def find_column(df, candidates):
-    """根据候选字段名动态匹配列"""
     for cand in candidates:
         if cand in df.columns:
             return cand
@@ -277,14 +273,97 @@ def find_column(df, candidates):
                 return col
     return None
 
-def extract_image_url(row):
-    """提取图片 URL（支持“统计图”与“统计图-图片”）"""
+def extract_image_url(row, p_title=""):
+    default_workorder_img = "https://internal-api-drive-stream.feishu.cn/space/api/box/stream/download/preview/Qt6pbnTeNo3Y9DxuERlcPPAZnIh?extra=%7B%22bitablePerm%22%3A%7B%22tableId%22%3A%22tblYtSIkGK07Na1M%22%2C%22rev%22%3A146%2C%22attachments%22%3A%7B%22fldt82h6VW%22%3A%7B%22recvuTXB4GVwCg%22%3A%5B%22Qt6pbnTeNo3Y9DxuERlcPPAZnIh%22%5D%7D%7D%7D%7D&mount_point=bitable&preview_type=16&version=7685209289593572280"
     for col in ["统计图", "统计图-图片", "图片", "图表"]:
         if col in row and row[col]:
             val = str(row[col]).strip()
             if val.startswith("http://") or val.startswith("https://"):
                 return val
+    if "工单" in p_title:
+        return default_workorder_img
     return None
+
+# 解析表格 3（部门非交付事项）
+def parse_non_delivery_data(df):
+    if df.empty:
+        return {}
+    col_grp = find_column(df, ["负责小组", "小组", "部门", "负责部门", "团队", "组别", "归属", "业务大类", "分类"])
+    col_cnt = find_column(df, ["部门事项汇总", "非交付事项", "事项汇总", "事项内容", "工作内容", "本周事项", "主要工作", "内容", "进展"])
+    
+    # 智能启发式兜底匹配
+    if not col_grp:
+        for col in df.columns:
+            sample = "".join([str(x) for x in df[col].dropna()[:5]])
+            if any(k in sample for k in ["客服", "客户", "IT", "it", "数据", "研发"]):
+                col_grp = col
+                break
+    if not col_cnt:
+        lens = {col: df[col].astype(str).map(len).mean() for col in df.columns if col != col_grp}
+        if lens:
+            col_cnt = max(lens, key=lens.get)
+            
+    res = {}
+    if col_grp and col_cnt:
+        for _, r in df.iterrows():
+            g = normalize_group_name(r.get(col_grp))
+            c = r.get(col_cnt)
+            if g and c:
+                clean_c = fmt_txt(c)
+                if g in res:
+                    res[g] += "<br><br>" + clean_c
+                else:
+                    res[g] = clean_c
+    return res
+
+# 解析表格 4（接诉即办专项分析）动态图表与方案
+def parse_complaint_data(df):
+    if df.empty:
+        return [], []
+    col_area = find_column(df, ["统计月份-区域", "月份-区域", "区域", "月份", "统计月份", "项目", "名称"])
+    if not col_area:
+        col_area = df.columns[0]
+    col_plan = find_column(df, ["改进方案落实情况", "落实情况", "改进方案", "整改方案", "方案", "措施"])
+    
+    # 方案表格行
+    plans = []
+    for _, r in df.iterrows():
+        a = str(r.get(col_area, "")).strip()
+        p = str(r.get(col_plan, "")).strip() if col_plan else ""
+        if a and a not in [item["area"] for item in plans]:
+            plans.append({"area": a, "plan": fmt_txt(p) if p else "暂无记录"})
+            
+    # 图表数据动态识别
+    known_cats = ["算法问题", "运维问题", "设备问题", "人工问题", "无法追溯", "平台问题", "网络问题", "其他问题"]
+    cat_cols = [c for c in df.columns if any(k in c for k in known_cats) and c != col_plan]
+    
+    chart_list = []
+    if cat_cols:
+        for _, r in df.iterrows():
+            a = str(r.get(col_area, "")).strip()
+            if not a:
+                continue
+            cats = []
+            for c in cat_cols:
+                try:
+                    val = int(float(str(r.get(c, 0)).strip()))
+                except Exception:
+                    val = 0
+                if val > 0:
+                    cats.append({"name": c, "value": val})
+            if cats:
+                chart_list.append({"name": a, "total": sum(x["value"] for x in cats), "cats": cats})
+                
+    if not chart_list:
+        col_c_type = find_column(df, ["问题分类", "客诉分类", "分类", "原因分类", "类型"])
+        if col_c_type:
+            for a, grp in df.groupby(col_area):
+                counts = grp[col_c_type].value_counts()
+                cats = [{"name": str(k), "value": int(v)} for k, v in counts.items() if str(k).strip()]
+                if cats:
+                    chart_list.append({"name": str(a), "total": sum(x["value"] for x in cats), "cats": cats})
+                    
+    return chart_list, plans
 
 # 5. 顶部布局
 col_title, col_btn = st.columns([5, 1])
@@ -450,13 +529,13 @@ with tab3:
         fin_cards.append('</div>')
         render_html("\n".join(fin_cards))
 
-# ==================== Tab 4：其他事项汇总（动态合并 3 个表格） ====================
+# ==================== Tab 4：其他事项汇总（动态聚合） ====================
 with tab4:
-    with st.spinner("正在从飞书 3 个子表动态聚合最新数据..."):
-        # 拉取表格 2：自研产品与重点专项（合并两视图）
-        df_prod = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_PROD)
-        df_spec = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_SPEC)
-        df_dev_all = pd.concat([df_prod, df_spec], ignore_index=True) if (not df_prod.empty or not df_spec.empty) else pd.DataFrame()
+    with st.spinner("正在从飞书动态同步子表最新数据..."):
+        # 拉取表格 2：自研产品与重点专项
+        df_p = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_PROD)
+        df_s = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_SPEC)
+        df_dev_all = pd.concat([df_p, df_s], ignore_index=True) if (not df_p.empty or not df_s.empty) else pd.DataFrame()
         
         # 拉取表格 3：部门非交付事项
         df_non_del = fetch_feishu_view(TABLE_NON_DEL_ID, VIEW_NON_DEL)
@@ -464,49 +543,39 @@ with tab4:
         # 拉取表格 4：接诉即办专项分析
         df_complaint = fetch_feishu_view(TABLE_COMPLAINT_ID, VIEW_COMPLAINT)
 
+    # 提取表格 3 部门事项汇总
+    non_del_summary_map = parse_non_delivery_data(df_non_del)
+
     # 识别表格 2 字段
     col_dev_name = find_column(df_dev_all, ["产品/专项名称", "产品名称", "专项名称", "名称"])
     col_dev_cat = find_column(df_dev_all, ["分类", "类别"])
     col_dev_cur = find_column(df_dev_all, ["本周进度与建设情况", "本周进度", "建设情况"])
     col_dev_next = find_column(df_dev_all, ["下周工作计划", "下周计划", "工作计划"])
-    col_dev_group = find_column(df_dev_all, ["负责小组", "小组", "部门", "组别"])
+    col_dev_group = find_column(df_dev_all, ["负责小组", "小组", "部门", "组别", "团队"])
 
-    # 识别表格 3 字段
-    col_nd_group = find_column(df_non_del, ["负责小组", "小组", "部门", "组别"])
-    col_nd_content = find_column(df_non_del, ["部门事项汇总", "事项汇总", "本周事项", "内容", "工作汇总"])
-
-    # 预定义 5 大团队顺序
     groups_order = ["客户服务组", "IT组", "交付研发一组", "数据处理组", "交付研发二组"]
 
     for grp in groups_order:
         render_html(f'<h2 class="section-title"><span class="grad-text">{grp}</span></h2>')
         
-        # 1. 交付研发二组：渲染 ECharts 环形图与落实表
+        # 1. 交付研发二组：接诉即办图表与落实方案
         if grp == "交付研发二组":
-            # 动态生成落实情况表行
-            table_rows_html = ""
-            chart_data = []
+            chart_list, plan_list = parse_complaint_data(df_complaint)
             
-            if not df_complaint.empty:
-                col_c_area = find_column(df_complaint, ["统计月份-区域", "月份-区域", "区域", "月份"])
-                col_c_plan = find_column(df_complaint, ["改进方案落实情况", "落实情况", "改进方案", "方案"])
-                
-                for _, crow in df_complaint.iterrows():
-                    area_val = crow.get(col_c_area) if col_c_area else "9月"
-                    plan_val = fmt_txt(crow.get(col_c_plan)) if col_c_plan else "-"
-                    table_rows_html += f"<tr><td style='font-weight:700;'>{area_val}</td><td>{plan_val}</td></tr>"
-            
-            # 若表格无数据则保底呈现
-            if not table_rows_html:
-                table_rows_html = """
-                <tr><td style='font-weight:700;'>9月-海淀区</td><td><strong>算法侧：</strong>1、针对模糊识别算法提升，计划11月6日上线；2、针对遮挡场景算法提升，计划11月13日上线。<br><strong>运维侧：</strong>已整改完成<br><strong>人工侧：</strong>已转至静态负责人加强人员管理</td></tr>
-                <tr><td style='font-weight:700;'>9月-昌平区</td><td>暂无记录</td></tr>
-                """
+            # 若表格 4 暂无记录则自动保底展现规范结构
+            if not chart_list:
+                chart_list = [
+                    {"name": "9月-海淀区", "total": 6, "cats": [{"name": "算法问题", "value": 3}, {"name": "人工问题", "value": 1}, {"name": "运维问题", "value": 1}, {"name": "设备问题", "value": 1}]},
+                    {"name": "9月-昌平区", "total": 4, "cats": [{"name": "算法问题", "value": 1}, {"name": "运维问题", "value": 1}, {"name": "设备问题", "value": 1}, {"name": "无法追溯", "value": 1}]}
+                ]
+            if not plan_list:
+                plan_list = [
+                    {"area": "9月-海淀区", "plan": "算法侧：1、针对模糊识别算法提升，计划11月6日上线；2、针对遮挡场景算法提升，计划11月13日上线。<br>运维侧：已整改完成<br>人工侧：已转至静态负责人加强人员管理"},
+                    {"area": "9月-昌平区", "plan": "暂无记录"}
+                ]
 
-            chart_json = json.dumps([
-                {"name": "9月-海淀区", "total": 6, "cats": [{"name": "人工问题", "value": 1}, {"name": "运维问题", "value": 1}, {"name": "设备问题", "value": 1}, {"name": "算法问题", "value": 3}]},
-                {"name": "9月-昌平区", "total": 4, "cats": [{"name": "运维问题", "value": 1}, {"name": "设备问题", "value": 1}, {"name": "算法问题", "value": 1}, {"name": "无法追溯", "value": 1}]}
-            ], ensure_ascii=False)
+            chart_json = json.dumps(chart_list, ensure_ascii=False)
+            table_rows_html = "".join([f"<tr><td style='font-weight:700;'>{x['area']}</td><td>{x['plan']}</td></tr>" for x in plan_list])
 
             echarts_html = f"""
             <!DOCTYPE html><html><head><meta charset="utf-8"><script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
@@ -554,22 +623,21 @@ with tab4:
             """)
             continue
 
-        # 2. 其他组（客服、IT、研发一组、数据处理组）：动态组装卡片
+        # 2. 其他组（客户服务组、IT组、交付研发一组、数据处理组）
         grp_cards = ['<div class="card-stack">']
         has_content = False
 
-        # A. 提取并渲染该小组在【表格 2】中的自研产品与重点专项
+        # A. 自研产品与重点专项（表格 2）
         if not df_dev_all.empty and col_dev_group:
             matching_dev = df_dev_all[df_dev_all[col_dev_group].apply(normalize_group_name) == grp]
             for _, drow in matching_dev.iterrows():
                 has_content = True
-                p_title = drow.get(col_dev_name) or "专项项目"
+                p_title = drow.get(col_dev_name) or "专项产品"
                 cat_tag = drow.get(col_dev_cat) or "自研产品"
                 cur_prog = fmt_txt(drow.get(col_dev_cur))
                 next_plan = fmt_txt(drow.get(col_dev_next))
-                img_url = extract_image_url(drow)
+                img_url = extract_image_url(drow, p_title)
 
-                # 动态生成图片标签
                 img_tag_html = f'<div class="img-container"><img src="{img_url}" alt="{p_title}统计图"></div>' if img_url else ''
 
                 grp_cards.append(f"""
@@ -583,20 +651,17 @@ with tab4:
                 </div>
                 """)
 
-        # B. 提取并渲染该小组在【表格 3】中的部门事项汇总
-        if not df_non_del.empty and col_nd_group:
-            matching_nd = df_non_del[df_non_del[col_nd_group].apply(normalize_group_name) == grp]
-            for _, ndrow in matching_nd.iterrows():
-                has_content = True
-                content_txt = fmt_txt(ndrow.get(col_nd_content))
-                grp_cards.append(f"""
-                <div class="card">
-                    <div class="card-title ct0"><span>部门事项汇总</span></div>
-                    <div class="field-row mt12 ct0"><span class="value">{content_txt}</span></div>
-                </div>
-                """)
+        # B. 部门事项汇总（表格 3 动态获取）
+        if grp in non_del_summary_map:
+            has_content = True
+            content_txt = non_del_summary_map[grp]
+            grp_cards.append(f"""
+            <div class="card">
+                <div class="card-title ct0"><span>部门事项汇总</span></div>
+                <div class="field-row mt12 ct0"><span class="value">{content_txt}</span></div>
+            </div>
+            """)
 
-        # 若多维表格无对应数据则显示空状态
         if not has_content:
             grp_cards.append('<div class="card"><div class="field-row ct0"><span class="value">本周暂无申报事项</span></div></div>')
 
