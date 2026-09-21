@@ -5,7 +5,7 @@ import pandas as pd
 import json
 import base64
 
-# 1. 页面基本设置（默认展开左侧导航栏）
+# 1. 页面基本配置（默认展开左侧导航）
 st.set_page_config(
     page_title="全球技术服务中心周报",
     layout="wide",
@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. 飞书凭据与多表多视图配置
+# 2. 飞书凭据与表格配置
 APP_ID = "cli_aa2529e038f81be3"
 APP_SECRET = "gKBRXaqMIYKGGqc9RkyH0b11V4Dk4PSY"
 APP_TOKEN = "JqHKw49V3izuZKkm9s8ccGwNnmb"
@@ -42,10 +42,10 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局与左侧侧边栏样式
+# 3. 注入全局样式与侧边栏毛玻璃美化
 render_html("""
 <style>
-/* 全局背景与字体 */
+/* 全局微光渐变背景 */
 .stApp {
     background: radial-gradient(60% 52% at 12% 8%,rgba(99,102,241,.16),transparent 70%),
                 radial-gradient(55% 46% at 90% 6%,rgba(56,189,248,.15),transparent 70%),
@@ -56,7 +56,7 @@ render_html("""
     color: #1E293B;
 }
 
-/* 侧边栏整体毛玻璃美化 */
+/* 侧边栏毛玻璃质感 */
 [data-testid="stSidebar"] {
     background: rgba(255, 255, 255, 0.88) !important;
     border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
@@ -67,8 +67,6 @@ render_html("""
 [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
     padding: 24px 14px !important;
 }
-
-/* 侧边栏标题渐变 */
 .sidebar-title {
     font-size: 21px;
     font-weight: 800;
@@ -82,7 +80,7 @@ render_html("""
     display: block;
 }
 
-/* 侧边栏单选导航改造成胶囊按钮 (.nav-item) */
+/* 侧边栏胶囊导航按钮 */
 [data-testid="stSidebar"] div[data-testid="stRadio"] > div {
     gap: 8px !important;
 }
@@ -102,13 +100,12 @@ render_html("""
     align-items: center !important;
 }
 [data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child {
-    display: none !important; /* 隐藏原生圆形选择框 */
+    display: none !important;
 }
 [data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {
     background: #F1F5F9 !important;
     color: #1E1B4B !important;
 }
-/* 选中项高亮渐变 */
 [data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"],
 [data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) {
     color: #ffffff !important;
@@ -121,7 +118,7 @@ render_html("""
     font-weight: 800 !important;
 }
 
-/* 顶部大标题 */
+/* 顶部标题与轻量数量标签 */
 .report-header {
     font-size: 28px;
     font-weight: 800;
@@ -132,8 +129,6 @@ render_html("""
     color: transparent;
     display: inline-block;
 }
-
-/* 统一轻量数量提示 */
 .tab-summary-badge {
     font-size: 15px;
     font-weight: 700;
@@ -144,14 +139,14 @@ render_html("""
     gap: 6px;
 }
 
-/* 悬浮刷新按钮 (FAB 胶囊) */
+/* 右下角悬浮刷新按钮（FAB 胶囊） */
 button[kind="primary"] {
     position: fixed !important;
-    bottom: 60px !important;
+    bottom: 45px !important;
     right: 28px !important;
     z-index: 99999 !important;
     border-radius: 99px !important;
-    padding: 8px 16px !important;
+    padding: 8px 18px !important;
     font-size: 13px !important;
     font-weight: 700 !important;
     background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
@@ -169,7 +164,7 @@ button[kind="primary"]:hover {
     background: linear-gradient(135deg, #4338CA, #1D4ED8) !important;
 }
 
-/* 卡片系统与排版 */
+/* 磨砂卡片与基础组件 */
 .section-title {
     font-size: 23px;
     font-weight: 800;
@@ -285,9 +280,26 @@ button[kind="primary"]:hover {
 </style>
 """)
 
-# 4. 数据拉取与字段清洗
+# 4. 全局深度清洗与防 nan 函数
+def safe_val(val, default="-"):
+    """清洗单行文本或标签，严格过滤 nan、None、null，防止标签渲染为 nan"""
+    if val is None or pd.isna(val):
+        return default
+    s = str(val).strip()
+    if s.lower() in ["nan", "none", "null", "<na>", "undefined", ""]:
+        return default
+    return s
+
+def fmt_txt(val, default="-"):
+    """清洗多行富文本并转换换行符"""
+    s = safe_val(val, default)
+    if s == default:
+        return default
+    return s.replace("\r\n", "<br>").replace("\n", "<br>")
+
 def clean_cell_value(val):
-    if val is None:
+    """清洗飞书特殊对象"""
+    if val is None or pd.isna(val):
         return ""
     if isinstance(val, dict):
         return val.get("link") or val.get("url") or val.get("text") or val.get("name") or ""
@@ -305,56 +317,13 @@ def clean_cell_value(val):
         return " / ".join(texts) if texts else ""
     return val
 
-@st.cache_data(ttl=180)
-def fetch_feishu_view(table_id, view_id=None):
-    token_url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
-    t_res = requests.post(token_url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
-    if t_res.get("code") != 0:
-        return pd.DataFrame()
-    token = t_res["tenant_access_token"]
-    
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    all_records = []
-    page_token = ""
-    while True:
-        params = {"page_size": 100}
-        if view_id:
-            params["view_id"] = view_id
-        if page_token:
-            params["page_token"] = page_token
-        res = requests.get(url, headers=headers, params=params, timeout=15).json()
-        if res.get("code") != 0:
-            break
-        items = res.get("data", {}).get("items", [])
-        all_records.extend(items)
-        if not res.get("data", {}).get("has_more", False):
-            break
-        page_token = res.get("data", {}).get("page_token")
-        
-    if not all_records:
-        return pd.DataFrame()
-        
-    cleaned_rows = []
-    for r in all_records:
-        raw_f = r.get("fields", {})
-        row = {}
-        for k, v in raw_f.items():
-            row[k] = clean_cell_value(v)
-        cleaned_rows.append(row)
-    return pd.DataFrame(cleaned_rows)
-
-def fmt_txt(val):
-    if not val or pd.isna(val) or str(val).strip().lower() in ["none", "nan", ""]:
-        return "-"
-    return str(val).strip().replace("\r\n", "<br>").replace("\n", "<br>")
-
 def fmt_progress(val):
-    if not val or pd.isna(val) or str(val).strip().lower() in ["none", "nan", ""]:
+    """进度条百分比换算"""
+    s = safe_val(val, "")
+    if not s:
         return 0.0, "0%"
     try:
-        num = float(str(val).replace("%", "").strip())
+        num = float(s.replace("%", "").strip())
         pct = round(num * 100, 1) if num <= 1.0 else round(num, 1)
         pct_int = int(pct) if pct.is_integer() else pct
         return min(max(pct, 0.0), 100.0), f"{pct_int}%"
@@ -362,7 +331,7 @@ def fmt_progress(val):
         return 0.0, "0%"
 
 def normalize_group_name(val):
-    s = str(val).strip() if val else ""
+    s = safe_val(val, "")
     if "客服" in s or "客户" in s:
         return "客户服务组"
     if "IT" in s or "it" in s:
@@ -410,6 +379,73 @@ def extract_image_url(row, p_title=""):
         return to_base64_image(default_workorder_img)
     return None
 
+def fetch_feishu_view(table_id, view_id=None):
+    token_url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+    t_res = requests.post(token_url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
+    if t_res.get("code") != 0:
+        return pd.DataFrame()
+    token = t_res["tenant_access_token"]
+    
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    all_records = []
+    page_token = ""
+    while True:
+        params = {"page_size": 100}
+        if view_id:
+            params["view_id"] = view_id
+        if page_token:
+            params["page_token"] = page_token
+        res = requests.get(url, headers=headers, params=params, timeout=15).json()
+        if res.get("code") != 0:
+            break
+        items = res.get("data", {}).get("items", [])
+        all_records.extend(items)
+        if not res.get("data", {}).get("has_more", False):
+            break
+        page_token = res.get("data", {}).get("page_token")
+        
+    if not all_records:
+        return pd.DataFrame()
+        
+    cleaned_rows = []
+    for r in all_records:
+        raw_f = r.get("fields", {})
+        row = {}
+        for k, v in raw_f.items():
+            row[k] = clean_cell_value(v)
+        cleaned_rows.append(row)
+    return pd.DataFrame(cleaned_rows)
+
+# ----------------- 5. 全局预加载（解决切换 Tab 重复 Loading 的核心） -----------------
+@st.cache_data(ttl=300)
+def load_all_dashboard_data():
+    """预加载所有子表数据，使得 Tab 切换 0 延迟"""
+    df_del = fetch_feishu_view(TABLE_LIFE_ID, VIEW_DELIVERY)
+    df_maint = fetch_feishu_view(TABLE_LIFE_ID, VIEW_MAINT)
+    df_fin = fetch_feishu_view(TABLE_LIFE_ID, VIEW_FINISH)
+    
+    df_p = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_PROD)
+    df_s = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_SPEC)
+    df_dev_all = pd.concat([df_p, df_s], ignore_index=True) if (not df_p.empty or not df_s.empty) else pd.DataFrame()
+    
+    df_non_del = fetch_feishu_view(TABLE_NON_DEL_ID, VIEW_NON_DEL)
+    df_complaint = fetch_feishu_view(TABLE_COMPLAINT_ID, VIEW_COMPLAINT)
+    
+    return {
+        "delivery": df_del,
+        "maint": df_maint,
+        "finish": df_fin,
+        "dev_all": df_dev_all,
+        "non_del": df_non_del,
+        "complaint": df_complaint
+    }
+
+# 页面启动时一次性预载入内存
+with st.spinner("正在同步飞书全量数据..."):
+    DATA_HUB = load_all_dashboard_data()
+
 # 解析表格 3（部门非交付事项）
 def parse_non_delivery_data(df):
     if df.empty:
@@ -424,7 +460,7 @@ def parse_non_delivery_data(df):
         if not c_raw and "进度及关注事项" in r:
             c_raw = r.get("进度及关注事项")
         c_clean = fmt_txt(c_raw)
-        if g and c_clean and c_clean != "-":
+        if g and c_clean != "-":
             if g in res:
                 res[g] += "<br><br>" + c_clean
             else:
@@ -450,8 +486,8 @@ def parse_complaint_data(df):
     chart_list = []
     plans = []
     for _, r in df.iterrows():
-        name = str(r.get(col_month) or r.get(col_area) or "客诉分析").strip()
-        area_name = str(r.get(col_area) or r.get(col_month) or "").strip()
+        name = safe_val(r.get(col_month) or r.get(col_area), "客诉分析")
+        area_name = safe_val(r.get(col_area) or r.get(col_month), "")
         try:
             total = int(float(str(r.get(col_total, 0) or 0).strip()))
         except Exception:
@@ -480,7 +516,7 @@ def parse_complaint_data(df):
             
     return chart_list, plans
 
-# ----------------- 5. 左侧侧边栏导航 -----------------
+# ----------------- 6. 侧边栏导航与悬浮刷新 -----------------
 with st.sidebar:
     render_html('<span class="sidebar-title">GTS 周会汇报</span>')
     selected_tab = st.radio(
@@ -489,39 +525,47 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-# ----------------- 6. 右下角常驻悬浮刷新按钮 -----------------
+# 右下角悬浮刷新按钮
 if st.button("🔄 刷新数据", type="primary"):
     st.cache_data.clear()
     st.rerun()
 
-# 页面顶部标题
+# 页面顶部大标题
 render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
 
 # ==================== Tab 1：交付中项目 ====================
 if selected_tab == "📦 交付中项目":
-    with st.spinner("正在拉取【交付中项目】..."):
-        df_del = fetch_feishu_view(TABLE_LIFE_ID, VIEW_DELIVERY)
+    df_del = DATA_HUB["delivery"]
     if df_del.empty:
         st.info("暂未获取到交付中项目数据。")
     else:
-        # 极简数量统计行
         render_html(f'<div class="tab-summary-badge">共计 <strong>{len(df_del)}</strong> 个交付中项目</div>')
+        
+        # 智能匹配字段名
+        col_c_done = find_column(df_del, ["已完成事项", "已完成工作", "已完成", "完成事项"])
+        col_c_desc = find_column(df_del, ["交付内容", "交付范围", "建设内容"])
         
         cards_html = ['<div class="card-stack">']
         for _, row in df_del.iterrows():
-            p_name = row.get("项目名称") or "未命名项目"
-            bu = row.get("BU") or "爱泊车"
-            status = row.get("项目状态") or "交付中"
+            p_name = safe_val(row.get("项目名称"), "未命名项目")
+            bu = safe_val(row.get("BU"), "-")
+            status = safe_val(row.get("项目状态"), "交付中")
             p_width, p_label = fmt_progress(row.get("完成进度"))
             c_sign = fmt_txt(row.get("合同签订时间"))
             c_acc = fmt_txt(row.get("计划验收时间"))
-            c_desc = fmt_txt(row.get("交付内容"))
-            c_done = fmt_txt(row.get("已完成事项"))
+            
+            # 核心优化 2：交付内容优先取“已完成事项”
+            raw_done = row.get(col_c_done) if col_c_done else row.get("已完成事项")
+            raw_desc = row.get(col_c_desc) if col_c_desc else row.get("交付内容")
+            
+            c_desc = fmt_txt(raw_done or raw_desc)
+            c_done = fmt_txt(raw_desc if (raw_desc and raw_desc != raw_done) else "-")
+            
             s_prog = fmt_txt(row.get("项目进度-软件侧"))
             h_prog = fmt_txt(row.get("项目进度-硬件侧"))
             d_supp = fmt_txt(row.get("项目进度-交付支持") or row.get("交付支持"))
-            risk = row.get("风险点和协调项")
-            risk_html = f'<span class="risk-text">{fmt_txt(risk)}</span>' if (risk and str(risk).strip() not in ["-", "", "None", "nan"]) else '<span class="value">-</span>'
+            risk = safe_val(row.get("风险点和协调项"), "-")
+            risk_html = f'<span class="risk-text">{fmt_txt(risk)}</span>' if risk != "-" else '<span class="value">-</span>'
             
             cards_html.append(f"""
             <div class="card">
@@ -554,7 +598,7 @@ if selected_tab == "📦 交付中项目":
         cards_html.append('</div>')
         render_html("\n".join(cards_html))
         
-        # 底部进度说明对照表
+        # 底部规范说明
         render_html("""
         <div class="card" style="max-width:760px;margin:32px auto 10px;">
             <div class="card-title" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">“项目完成进度”说明</div>
@@ -575,8 +619,7 @@ if selected_tab == "📦 交付中项目":
 
 # ==================== Tab 2：运维中项目 ====================
 elif selected_tab == "🔧 运维中项目":
-    with st.spinner("正在拉取【运维中项目】..."):
-        df_maint = fetch_feishu_view(TABLE_LIFE_ID, VIEW_MAINT)
+    df_maint = DATA_HUB["maint"]
     if df_maint.empty:
         st.info("暂无运维中项目。")
     else:
@@ -584,13 +627,15 @@ elif selected_tab == "🔧 运维中项目":
         
         maint_cards = ['<div class="card-stack">']
         for _, row in df_maint.iterrows():
-            p_name = row.get("项目名称") or "未命名项目"
-            bu = row.get("BU") or "-"
-            s_date = fmt_txt(row.get("运维开始时间"))
-            e_date = fmt_txt(row.get("运维结束时间"))
+            p_name = safe_val(row.get("项目名称"), "未命名项目")
+            # 核心优化 3：严格过滤 nan
+            bu = safe_val(row.get("BU"), "-")
+            s_date = safe_val(row.get("运维开始时间"), "-")
+            e_date = safe_val(row.get("运维结束时间"), "-")
             cycle = f"{s_date} ~ {e_date}" if s_date != "-" or e_date != "-" else "- ~ -"
             remark = fmt_txt(row.get("备注说明"))
             progress_matters = fmt_txt(row.get("本周进度及关注事项"))
+            
             maint_cards.append(f"""
             <div class="card">
                 <div class="card-title"><span>{p_name} <span class="tag">{bu}</span></span></div>
@@ -613,8 +658,7 @@ elif selected_tab == "🔧 运维中项目":
 
 # ==================== Tab 3：已完结/挂起项目 ====================
 elif selected_tab == "🏁 已完结/挂起项目":
-    with st.spinner("正在拉取【已完结/挂起项目】..."):
-        df_fin = fetch_feishu_view(TABLE_LIFE_ID, VIEW_FINISH)
+    df_fin = DATA_HUB["finish"]
     if df_fin.empty:
         st.info("暂无已完结或挂起项目。")
     else:
@@ -622,10 +666,11 @@ elif selected_tab == "🏁 已完结/挂起项目":
         
         fin_cards = ['<div class="card-stack">']
         for _, row in df_fin.iterrows():
-            p_name = row.get("项目名称") or "未命名项目"
-            bu = row.get("BU") or "爱泊车"
-            status = row.get("项目状态(完结)") or row.get("项目状态") or "项目结束"
+            p_name = safe_val(row.get("项目名称"), "未命名项目")
+            bu = safe_val(row.get("BU"), "爱泊车")
+            status = safe_val(row.get("项目状态(完结)") or row.get("项目状态"), "项目结束")
             remark = fmt_txt(row.get("备注说明"))
+            
             fin_cards.append(f"""
             <div class="card" style="padding: 20px 24px;">
                 <div class="card-title" style="padding-bottom: 8px; margin-bottom: 12px;">
@@ -642,12 +687,9 @@ elif selected_tab == "🏁 已完结/挂起项目":
 
 # ==================== Tab 4：其他事项汇总 ====================
 elif selected_tab == "📑 其他事项汇总":
-    with st.spinner("正在从飞书动态同步子表最新数据..."):
-        df_p = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_PROD)
-        df_s = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_SPEC)
-        df_dev_all = pd.concat([df_p, df_s], ignore_index=True) if (not df_p.empty or not df_s.empty) else pd.DataFrame()
-        df_non_del = fetch_feishu_view(TABLE_NON_DEL_ID, VIEW_NON_DEL)
-        df_complaint = fetch_feishu_view(TABLE_COMPLAINT_ID, VIEW_COMPLAINT)
+    df_dev_all = DATA_HUB["dev_all"]
+    df_non_del = DATA_HUB["non_del"]
+    df_complaint = DATA_HUB["complaint"]
 
     non_del_summary_map = parse_non_delivery_data(df_non_del)
 
@@ -662,7 +704,7 @@ elif selected_tab == "📑 其他事项汇总":
     for grp in groups_order:
         render_html(f'<h2 class="section-title"><span class="grad-text">{grp}</span></h2>')
         
-        # 1. 交付研发二组：客诉问题饼图与落实表
+        # 1. 交付研发二组：接诉即办图表与落实表
         if grp == "交付研发二组":
             chart_list, plan_list = parse_complaint_data(df_complaint)
             if not chart_list:
@@ -677,7 +719,7 @@ elif selected_tab == "📑 其他事项汇总":
                 ]
 
             chart_json = json.dumps(chart_list, ensure_ascii=False)
-            table_rows_html = "".join([f"<tr><td style='font-weight:700;'>{x['area']}</td><td>{x['plan']}</td></tr>" for x in plan_list])
+            table_rows_html = "".join([f"<tr><td style='font-weight:700;'>{safe_val(x['area'])}</td><td>{x['plan']}</td></tr>" for x in plan_list])
 
             echarts_html = f"""
             <!DOCTYPE html><html><head><meta charset="utf-8"><script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
@@ -725,7 +767,7 @@ elif selected_tab == "📑 其他事项汇总":
             """)
             continue
 
-        # 2. 其他组（客户服务组、IT组、交付研发一组、数据处理组）
+        # 2. 其他小组
         grp_cards = ['<div class="card-stack">']
         has_content = False
 
@@ -733,8 +775,8 @@ elif selected_tab == "📑 其他事项汇总":
             matching_dev = df_dev_all[df_dev_all[col_dev_group].apply(normalize_group_name) == grp]
             for _, drow in matching_dev.iterrows():
                 has_content = True
-                p_title = drow.get(col_dev_name) or "专项产品"
-                cat_tag = drow.get(col_dev_cat) or "自研产品"
+                p_title = safe_val(drow.get(col_dev_name), "专项产品")
+                cat_tag = safe_val(drow.get(col_dev_cat), "自研产品")
                 cur_prog = fmt_txt(drow.get(col_dev_cur))
                 next_plan = fmt_txt(drow.get(col_dev_next))
                 img_url = extract_image_url(drow, p_title)
