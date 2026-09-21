@@ -5,7 +5,7 @@ import pandas as pd
 import json
 import base64
 
-# 1. 页面基本配置（默认展开左侧导航）
+# 1. 页面基本配置
 st.set_page_config(
     page_title="全球技术服务中心周报",
     layout="wide",
@@ -13,39 +13,34 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. 飞书凭据与表格配置
+# 2. 飞书凭据与多表配置
 APP_ID = "cli_aa2529e038f81be3"
 APP_SECRET = "gKBRXaqMIYKGGqc9RkyH0b11V4Dk4PSY"
 APP_TOKEN = "JqHKw49V3izuZKkm9s8ccGwNnmb"
 
-# 表格 1：项目全生命周期总表
 TABLE_LIFE_ID = "tblfMcfAnXH3luI7"
 VIEW_DELIVERY = "vewSu37vul"    # 交付中项目
 VIEW_MAINT = "vew4u7e0fo"       # 运维中项目
 VIEW_FINISH = "vewwcbPapg"      # 已完结/挂起项目
 
-# 表格 2：GTS自研产品与重点专项
 TABLE_DEV_ID = "tblYtSIkGK07Na1M"
 VIEW_DEV_PROD = "vewV4IWr91"    # 自研产品
 VIEW_DEV_SPEC = "vew1aFFPXR"    # 重点专项
 
-# 表格 3：部门非交付事项
 TABLE_NON_DEL_ID = "tbl9DVGuvIB6dOas"
 VIEW_NON_DEL = "vewCXHSZWx"
 
-# 表格 4：接诉即办专项分析
 TABLE_COMPLAINT_ID = "tblGj9QwAXsYOOrn"
 VIEW_COMPLAINT = "vewiedoaqM"
 
-# 安全渲染 HTML 辅助函数
+# 安全渲染 HTML
 def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局样式与侧边栏毛玻璃美化
+# 3. 注入全局与侧边栏样式
 render_html("""
 <style>
-/* 全局微光渐变背景 */
 .stApp {
     background: radial-gradient(60% 52% at 12% 8%,rgba(99,102,241,.16),transparent 70%),
                 radial-gradient(55% 46% at 90% 6%,rgba(56,189,248,.15),transparent 70%),
@@ -55,8 +50,6 @@ render_html("""
     font-family: 'PingFang SC','SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     color: #1E293B;
 }
-
-/* 侧边栏毛玻璃质感 */
 [data-testid="stSidebar"] {
     background: rgba(255, 255, 255, 0.88) !important;
     border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
@@ -79,8 +72,6 @@ render_html("""
     color: transparent;
     display: block;
 }
-
-/* 侧边栏胶囊导航按钮 */
 [data-testid="stSidebar"] div[data-testid="stRadio"] > div {
     gap: 8px !important;
 }
@@ -117,8 +108,6 @@ render_html("""
     color: #ffffff !important;
     font-weight: 800 !important;
 }
-
-/* 顶部标题与轻量数量标签 */
 .report-header {
     font-size: 28px;
     font-weight: 800;
@@ -138,8 +127,6 @@ render_html("""
     align-items: center;
     gap: 6px;
 }
-
-/* 右下角悬浮刷新按钮（FAB 胶囊） */
 button[kind="primary"] {
     position: fixed !important;
     bottom: 45px !important;
@@ -163,8 +150,6 @@ button[kind="primary"]:hover {
     box-shadow: 0 12px 26px rgba(79, 70, 229, 0.5) !important;
     background: linear-gradient(135deg, #4338CA, #1D4ED8) !important;
 }
-
-/* 磨砂卡片与基础组件 */
 .section-title {
     font-size: 23px;
     font-weight: 800;
@@ -280,29 +265,32 @@ button[kind="primary"]:hover {
 </style>
 """)
 
-# 4. 全局深度清洗与防 nan 函数
+# 4. 健壮的字段清洗与防 nan 函数（杜绝对 list/dict 调用 pd.isna）
 def safe_val(val, default="-"):
-    """清洗单行文本或标签，严格过滤 nan、None、null，防止标签渲染为 nan"""
-    if val is None or pd.isna(val):
+    if val is None:
         return default
+    if isinstance(val, (list, dict)):
+        return str(val) if val else default
+    try:
+        if pd.isna(val):
+            return default
+    except Exception:
+        pass
     s = str(val).strip()
     if s.lower() in ["nan", "none", "null", "<na>", "undefined", ""]:
         return default
     return s
 
 def fmt_txt(val, default="-"):
-    """清洗多行富文本并转换换行符"""
     s = safe_val(val, default)
     if s == default:
         return default
     return s.replace("\r\n", "<br>").replace("\n", "<br>")
 
 def clean_cell_value(val):
-    """清洗飞书特殊对象"""
-    if val is None or pd.isna(val):
+    """彻底修复报错处：先处理 list 与 dict，绝不在复杂类型上调用 pd.isna"""
+    if val is None:
         return ""
-    if isinstance(val, dict):
-        return val.get("link") or val.get("url") or val.get("text") or val.get("name") or ""
     if isinstance(val, list):
         texts = []
         for item in val:
@@ -315,10 +303,16 @@ def clean_cell_value(val):
             elif isinstance(item, (str, int, float)):
                 texts.append(str(item))
         return " / ".join(texts) if texts else ""
-    return val
+    if isinstance(val, dict):
+        return val.get("link") or val.get("url") or val.get("text") or val.get("name") or ""
+    try:
+        if pd.isna(val):
+            return ""
+    except Exception:
+        pass
+    return str(val)
 
 def fmt_progress(val):
-    """进度条百分比换算"""
     s = safe_val(val, "")
     if not s:
         return 0.0, "0%"
@@ -418,10 +412,9 @@ def fetch_feishu_view(table_id, view_id=None):
         cleaned_rows.append(row)
     return pd.DataFrame(cleaned_rows)
 
-# ----------------- 5. 全局预加载（解决切换 Tab 重复 Loading 的核心） -----------------
+# ----------------- 5. 全局预加载（Tab 切换 0 延迟） -----------------
 @st.cache_data(ttl=300)
 def load_all_dashboard_data():
-    """预加载所有子表数据，使得 Tab 切换 0 延迟"""
     df_del = fetch_feishu_view(TABLE_LIFE_ID, VIEW_DELIVERY)
     df_maint = fetch_feishu_view(TABLE_LIFE_ID, VIEW_MAINT)
     df_fin = fetch_feishu_view(TABLE_LIFE_ID, VIEW_FINISH)
@@ -442,7 +435,6 @@ def load_all_dashboard_data():
         "complaint": df_complaint
     }
 
-# 页面启动时一次性预载入内存
 with st.spinner("正在同步飞书全量数据..."):
     DATA_HUB = load_all_dashboard_data()
 
@@ -530,7 +522,7 @@ if st.button("🔄 刷新数据", type="primary"):
     st.cache_data.clear()
     st.rerun()
 
-# 页面顶部大标题
+# 页面顶部标题
 render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
 
 # ==================== Tab 1：交付中项目 ====================
@@ -541,7 +533,6 @@ if selected_tab == "📦 交付中项目":
     else:
         render_html(f'<div class="tab-summary-badge">共计 <strong>{len(df_del)}</strong> 个交付中项目</div>')
         
-        # 智能匹配字段名
         col_c_done = find_column(df_del, ["已完成事项", "已完成工作", "已完成", "完成事项"])
         col_c_desc = find_column(df_del, ["交付内容", "交付范围", "建设内容"])
         
@@ -554,7 +545,6 @@ if selected_tab == "📦 交付中项目":
             c_sign = fmt_txt(row.get("合同签订时间"))
             c_acc = fmt_txt(row.get("计划验收时间"))
             
-            # 核心优化 2：交付内容优先取“已完成事项”
             raw_done = row.get(col_c_done) if col_c_done else row.get("已完成事项")
             raw_desc = row.get(col_c_desc) if col_c_desc else row.get("交付内容")
             
@@ -598,7 +588,6 @@ if selected_tab == "📦 交付中项目":
         cards_html.append('</div>')
         render_html("\n".join(cards_html))
         
-        # 底部规范说明
         render_html("""
         <div class="card" style="max-width:760px;margin:32px auto 10px;">
             <div class="card-title" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">“项目完成进度”说明</div>
@@ -628,7 +617,6 @@ elif selected_tab == "🔧 运维中项目":
         maint_cards = ['<div class="card-stack">']
         for _, row in df_maint.iterrows():
             p_name = safe_val(row.get("项目名称"), "未命名项目")
-            # 核心优化 3：严格过滤 nan
             bu = safe_val(row.get("BU"), "-")
             s_date = safe_val(row.get("运维开始时间"), "-")
             e_date = safe_val(row.get("运维结束时间"), "-")
