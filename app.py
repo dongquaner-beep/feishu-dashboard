@@ -52,45 +52,47 @@ render_html("""
     color: #334155;
 }
 
-/* ================= 修复 1：顶栏透明化，隐藏右上角菜单，但恢复左上角侧边栏展开按钮 ================= */
+/* ================= 核心修复：保持 Header 透明悬浮，只隐藏右上角杂项，保留左上角展开按钮 ================= */
 header[data-testid="stHeader"] {
     background: transparent !important;
-    height: 0px !important;
-    min-height: 0px !important;
     pointer-events: none !important;
 }
 
-/* 隐藏右上角系统工具（Share、三点菜单、GitHub、彩条） */
+/* 彻底隐藏右上角系统工具（Share、三点菜单、编辑、彩条等） */
 [data-testid="stToolbar"],
 [data-testid="stDecoration"] {
     display: none !important;
     visibility: hidden !important;
 }
 
-/* 核心修复：确保收起侧边栏后，左上角的展开按钮（>）依然清晰可见且可点击 */
-[data-testid="collapsedControl"] {
+/* 核心：美化左上角侧边栏展开图标，确保可点击并带有毛玻璃效果 */
+[data-testid="stSidebarCollapsedControl"] {
     display: flex !important;
     visibility: visible !important;
     pointer-events: auto !important;
-    z-index: 999999 !important;
     position: fixed !important;
     top: 14px !important;
     left: 14px !important;
-    background: rgba(255, 255, 255, 0.95) !important;
+    z-index: 999999 !important;
+    background: rgba(255, 255, 255, 0.92) !important;
     border: 1px solid #C7D2FE !important;
     border-radius: 10px !important;
     padding: 6px 8px !important;
     box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08) !important;
     backdrop-filter: blur(12px) !important;
-    cursor: pointer !important;
     color: #4338CA !important;
+    cursor: pointer !important;
 }
-[data-testid="collapsedControl"]:hover {
+[data-testid="stSidebarCollapsedControl"] button {
+    color: #4338CA !important;
+    pointer-events: auto !important;
+}
+[data-testid="stSidebarCollapsedControl"]:hover {
     background: #EEF2FF !important;
-    color: #3730A3 !important;
+    border-color: #818CF8 !important;
 }
 
-/* ================= 修复 2：隐藏所有平台自带徽章与状态组件 ================= */
+/* 隐藏右下角 Manage app 悬浮框及底栏徽章 */
 .block-container {
     padding-top: 1.8rem !important;
 }
@@ -106,7 +108,7 @@ footer {
     pointer-events: none !important;
 }
 
-/* 侧边栏毛玻璃 */
+/* 侧边栏整体毛玻璃美化 */
 [data-testid="stSidebar"] {
     background: rgba(255, 255, 255, 0.88) !important;
     border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
@@ -265,6 +267,7 @@ button[kind="primary"]:hover {
     color: transparent;
 }
 
+/* 卡片排版 */
 .card-stack { display: flex; flex-direction: column; gap: 20px; }
 .card {
     position: relative;
@@ -642,7 +645,7 @@ def parse_complaint_data(df):
             
     return chart_list, plans
 
-# ----------------- 6. 侧边栏导航与双刷新按钮配置 -----------------
+# ----------------- 6. 侧边栏导航与自动展开保障 -----------------
 with st.sidebar:
     render_html('<span class="sidebar-title">GTS 周会汇报</span>')
     selected_tab = st.radio(
@@ -655,17 +658,25 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
 
-# 右下角悬浮刷新按钮（页面收起侧边栏时也可刷新）
+# 右下角悬浮刷新按钮
 if st.button("🔄 刷新数据", type="primary", key="fab_sync_btn"):
     st.cache_data.clear()
     st.rerun()
 
-# 注入 JS 脚本自动探测隐藏第三方徽章
+# 页面顶部自动展开侧边栏保障脚本 + 隐藏第三方徽章
 components.html("""
 <script>
-function hidePlatformBadges() {
+function initDashboard() {
     try {
         const d = window.top.document;
+        // 1. 如果侧边栏处于收起状态，自动点击展开按钮，确保首次进入必展开
+        const expandBtn = d.querySelector('[data-testid="stSidebarCollapsedControl"] button, button[aria-label="Open sidebar"]');
+        const sidebar = d.querySelector('[data-testid="stSidebar"]');
+        if (sidebar && sidebar.getAttribute('aria-expanded') === 'false' && expandBtn) {
+            expandBtn.click();
+        }
+        
+        // 2. 隐藏外层第三方徽章
         d.querySelectorAll('[data-testid="manage-app-button"], [href*="streamlit.io"], iframe[title="Frame"], div[class*="viewerBadge"], div[class*="StatusWidget"]').forEach(el => {
             el.style.setProperty('display', 'none', 'important');
             el.style.setProperty('visibility', 'hidden', 'important');
@@ -673,8 +684,8 @@ function hidePlatformBadges() {
         });
     } catch (e) {}
 }
-setInterval(hidePlatformBadges, 800);
-hidePlatformBadges();
+setTimeout(initDashboard, 300);
+setTimeout(initDashboard, 1000);
 </script>
 """, height=0, width=0)
 
