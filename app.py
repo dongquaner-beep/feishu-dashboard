@@ -15,8 +15,13 @@ VIEW_DELIVERY = "vewSu37vul"    # 交付中项目视图
 VIEW_MAINT = "vew4u7e0fo"       # 运维中项目视图
 VIEW_FINISH = "vewwcbPapg"      # 已完结项目视图
 
+# 安全渲染 HTML 的辅助函数（彻底去除行首空格，防止被 Markdown 当成代码块）
+def render_html(html_str):
+    cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
+    st.markdown(cleaned, unsafe_allow_html=True)
+
 # 3. 注入同事 HTML 中的核心视觉样式（磨砂质感、流光进度条、双栏栅格、风险高亮）
-st.markdown("""
+render_html("""
 <style>
 /* 全局背景微光渐变与网格 */
 .stApp {
@@ -197,7 +202,7 @@ st.markdown("""
     background: #EEF2FF;
 }
 </style>
-""", unsafe_allow_html=True)
+""")
 
 # 4. 辅助函数：清洗特殊对象
 def clean_cell_value(val):
@@ -273,7 +278,7 @@ def fmt_progress(val):
 # 6. 顶部布局
 col_title, col_btn = st.columns([5, 1])
 with col_title:
-    st.markdown('<div class="report-header">📊 GTS 部门周会汇报大屏</div>', unsafe_allow_html=True)
+    render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
 with col_btn:
     if st.button("🔄 刷新最新数据", use_container_width=True):
         st.cache_data.clear()
@@ -304,7 +309,7 @@ with tab1:
         bu_cnt = df_del["BU"].nunique() if "BU" in df_del.columns else 1
         kpi3.metric("涉及业务板块", f"{bu_cnt} 个")
         
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.write("")
         
         # 逐个生成汇报卡片
         cards_html = ['<div class="card-stack">']
@@ -324,7 +329,6 @@ with tab1:
             d_supp = fmt_txt(row.get("项目进度-交付支持") or row.get("交付支持"))
             risk = row.get("风险点和协调项")
             
-            # 风险项是否有内容
             if risk and str(risk).strip() not in ["-", "", "None", "nan"]:
                 risk_html = f'<span class="risk-text">{fmt_txt(risk)}</span>'
             else:
@@ -366,10 +370,10 @@ with tab1:
             cards_html.append(card_item)
             
         cards_html.append('</div>')
-        st.markdown("\n".join(cards_html), unsafe_allow_html=True)
+        render_html("\n".join(cards_html))
         
-        # 底部“项目完成进度”说明规范对照表（与样例完全一致）
-        st.markdown("""
+        # 底部“项目完成进度”说明规范对照表
+        render_html("""
         <div class="card" style="max-width:760px;margin:32px auto 10px;">
             <div class="card-title" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">“项目完成进度”说明</div>
             <table class="spec-table">
@@ -385,7 +389,7 @@ with tab1:
                 <tr><td style="text-align:center;">9</td><td>终验</td><td style="text-align:right;">96%--100%</td></tr>
             </table>
         </div>
-        """, unsafe_allow_html=True)
+        """)
 
 # ==================== Tab 2：运维中项目（过渡保留） ====================
 with tab2:
