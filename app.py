@@ -38,7 +38,7 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局样式与系统自带组件隐藏
+# 3. 注入全局样式与核心布局修复
 render_html("""
 <style>
 /* 全局微光渐变背景 */
@@ -52,18 +52,58 @@ render_html("""
     color: #334155;
 }
 
-/* ================= 核心：隐藏系统自带顶栏与 Manage app 按钮 ================= */
+/* ================= 修复 1：顶栏透明化，隐藏右上角菜单，但恢复左上角侧边栏展开按钮 ================= */
 header[data-testid="stHeader"] {
-    display: none !important;
+    background: transparent !important;
+    height: 0px !important;
+    min-height: 0px !important;
+    pointer-events: none !important;
 }
+
+/* 隐藏右上角系统工具（Share、三点菜单、GitHub、彩条） */
+[data-testid="stToolbar"],
+[data-testid="stDecoration"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* 核心修复：确保收起侧边栏后，左上角的展开按钮（>）依然清晰可见且可点击 */
+[data-testid="collapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    z-index: 999999 !important;
+    position: fixed !important;
+    top: 14px !important;
+    left: 14px !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid #C7D2FE !important;
+    border-radius: 10px !important;
+    padding: 6px 8px !important;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08) !important;
+    backdrop-filter: blur(12px) !important;
+    cursor: pointer !important;
+    color: #4338CA !important;
+}
+[data-testid="collapsedControl"]:hover {
+    background: #EEF2FF !important;
+    color: #3730A3 !important;
+}
+
+/* ================= 修复 2：隐藏所有平台自带徽章与状态组件 ================= */
 .block-container {
     padding-top: 1.8rem !important;
 }
 [data-testid="manage-app-button"],
+[data-testid="stStatusWidget"],
 div[class*="viewerBadge"],
-.viewerBadge_container__1QSob,
+div[class*="StatusWidget"],
+iframe[title="Frame"],
 footer {
     display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 /* 侧边栏毛玻璃 */
@@ -153,10 +193,10 @@ footer {
     color: #1E293B;
 }
 
-/* 悬浮刷新胶囊 */
+/* 悬浮刷新胶囊（调整位置避让底角） */
 button[kind="primary"] {
     position: fixed !important;
-    bottom: 30px !important;
+    bottom: 50px !important;
     right: 28px !important;
     z-index: 99999 !important;
     border-radius: 99px !important;
@@ -197,7 +237,6 @@ button[kind="primary"]:hover {
     padding: 0 !important;
 }
 
-/* 汇报模块大标题 */
 .section-title {
     font-size: 22px;
     font-weight: 700;
@@ -226,7 +265,6 @@ button[kind="primary"]:hover {
     color: transparent;
 }
 
-/* 卡片排版 */
 .card-stack { display: flex; flex-direction: column; gap: 20px; }
 .card {
     position: relative;
@@ -604,7 +642,7 @@ def parse_complaint_data(df):
             
     return chart_list, plans
 
-# ----------------- 6. 侧边栏导航与悬浮刷新 -----------------
+# ----------------- 6. 侧边栏导航与双刷新按钮配置 -----------------
 with st.sidebar:
     render_html('<span class="sidebar-title">GTS 周会汇报</span>')
     selected_tab = st.radio(
@@ -612,11 +650,33 @@ with st.sidebar:
         options=["📦 交付中项目", "🔧 运维中项目", "🏁 已完结/挂起项目", "📑 其他事项汇总"],
         label_visibility="collapsed"
     )
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🔄 同步飞书最新数据", key="sidebar_sync_btn", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
-# 右下角悬浮刷新按钮
-if st.button("🔄 刷新数据", type="primary"):
+# 右下角悬浮刷新按钮（页面收起侧边栏时也可刷新）
+if st.button("🔄 刷新数据", type="primary", key="fab_sync_btn"):
     st.cache_data.clear()
     st.rerun()
+
+# 注入 JS 脚本自动探测隐藏第三方徽章
+components.html("""
+<script>
+function hidePlatformBadges() {
+    try {
+        const d = window.top.document;
+        d.querySelectorAll('[data-testid="manage-app-button"], [href*="streamlit.io"], iframe[title="Frame"], div[class*="viewerBadge"], div[class*="StatusWidget"]').forEach(el => {
+            el.style.setProperty('display', 'none', 'important');
+            el.style.setProperty('visibility', 'hidden', 'important');
+            el.style.setProperty('opacity', '0', 'important');
+        });
+    } catch (e) {}
+}
+setInterval(hidePlatformBadges, 800);
+hidePlatformBadges();
+</script>
+""", height=0, width=0)
 
 # 页面顶部标题
 render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
