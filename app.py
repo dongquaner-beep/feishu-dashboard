@@ -20,7 +20,7 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入同事 HTML 中的核心视觉样式（磨砂质感、流光进度条、双栏栅格、风险高亮）
+# 3. 注入同事 HTML 中的完整核心视觉样式
 render_html("""
 <style>
 /* 全局背景微光渐变与网格 */
@@ -96,6 +96,11 @@ render_html("""
     background: #ECFDF5;
     border-color: #A7F3D0;
 }
+.tag-muted {
+    color: #334155;
+    background: #F1F5F9;
+    border-color: #CBD5E1;
+}
 
 /* 流光动画进度条 */
 .progress-wrapper {
@@ -158,8 +163,12 @@ render_html("""
     color: #1E293B;
     font-weight: 500;
 }
+.target-red {
+    color: #DC2626;
+    font-weight: 700;
+}
 
-/* 右侧高亮区块与风险警示 */
+/* 高亮区块通用 */
 .highlight-block {
     padding: 16px 18px;
     border-radius: 16px;
@@ -167,6 +176,17 @@ render_html("""
     border: 1px solid #E2E8F0;
     border-left: 5px solid #6366F1;
 }
+
+/* 运维专属浅蓝高亮区块 */
+.highlight-attention {
+    border-color: #BFDBFE;
+    border-left: 5px solid #1D4ED8;
+    background: #EFF6FF;
+}
+.highlight-attention .label {
+    color: #1D4ED8;
+}
+
 .risk-text {
     display: block;
     margin-top: 6px;
@@ -287,9 +307,9 @@ with col_btn:
 # 四大分类标签页
 tab1, tab2, tab3, tab4 = st.tabs(["📦 交付中项目", "🔧 运维中项目", "🏁 已完结/挂起项目", "📑 其他事项汇总"])
 
-# ==================== Tab 1：交付中项目（高颜值汇报卡片流） ====================
+# ==================== Tab 1：交付中项目 ====================
 with tab1:
-    with st.spinner("正在从飞书拉取【交付中项目】最新汇报数据..."):
+    with st.spinner("正在拉取【交付中项目】最新汇报数据..."):
         df_del = fetch_feishu_view(TABLE_ID, VIEW_DELIVERY)
         
     if df_del.empty:
@@ -299,7 +319,6 @@ with tab1:
         kpi1, kpi2, kpi3 = st.columns(3)
         kpi1.metric("交付事项总数", f"{len(df_del)} 项")
         
-        # 计算平均进度
         avg_num = 0
         if "完成进度" in df_del.columns:
             nums = [fmt_progress(x)[0] for x in df_del["完成进度"]]
@@ -311,7 +330,7 @@ with tab1:
         
         st.write("")
         
-        # 逐个生成汇报卡片
+        # 汇报卡片流
         cards_html = ['<div class="card-stack">']
         for _, row in df_del.iterrows():
             p_name = row.get("项目名称") or "未命名项目"
@@ -372,7 +391,7 @@ with tab1:
         cards_html.append('</div>')
         render_html("\n".join(cards_html))
         
-        # 底部“项目完成进度”说明规范对照表
+        # 底部“项目完成进度”说明对照表
         render_html("""
         <div class="card" style="max-width:760px;margin:32px auto 10px;">
             <div class="card-title" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">“项目完成进度”说明</div>
@@ -391,24 +410,95 @@ with tab1:
         </div>
         """)
 
-# ==================== Tab 2：运维中项目（过渡保留） ====================
+# ==================== Tab 2：运维中项目（同事卡片样式升级） ====================
 with tab2:
-    with st.spinner("正在拉取【运维中项目】..."):
+    with st.spinner("正在拉取【运维中项目】最新汇报数据..."):
         df_maint = fetch_feishu_view(TABLE_ID, VIEW_MAINT)
-    if not df_maint.empty:
-        st.dataframe(df_maint, use_container_width=True, hide_index=True)
-    else:
+        
+    if df_maint.empty:
         st.info("暂无运维中项目。")
-
-# ==================== Tab 3：已完结/挂起项目（过渡保留） ====================
-with tab3:
-    with st.spinner("正在拉取【已完结项目】..."):
-        df_fin = fetch_feishu_view(TABLE_ID, VIEW_FINISH)
-    if not df_fin.empty:
-        st.dataframe(df_fin, use_container_width=True, hide_index=True)
     else:
-        st.info("暂无已完结项目。")
+        # 顶部 KPI 指标
+        m_kpi1, m_kpi2 = st.columns(2)
+        m_kpi1.metric("在保运维项目总数", f"{len(df_maint)} 项")
+        m_bu_cnt = df_maint["BU"].nunique() if "BU" in df_maint.columns else 1
+        m_kpi2.metric("涉及业务板块", f"{m_bu_cnt} 个")
+        
+        st.write("")
+        
+        # 运维汇报卡片流
+        maint_cards = ['<div class="card-stack">']
+        for _, row in df_maint.iterrows():
+            p_name = row.get("项目名称") or "未命名项目"
+            bu = row.get("BU") or "-"
+            
+            s_date = fmt_txt(row.get("运维开始时间"))
+            e_date = fmt_txt(row.get("运维结束时间"))
+            cycle = f"{s_date} ~ {e_date}" if s_date != "-" or e_date != "-" else "- ~ -"
+            
+            remark = fmt_txt(row.get("备注说明"))
+            progress_matters = fmt_txt(row.get("本周进度及关注事项"))
+            
+            card_item = f"""
+            <div class="card">
+                <div class="card-title">
+                    <span>{p_name} <span class="tag">{bu}</span></span>
+                </div>
+                <div class="grid-2" style="margin-top:14px;">
+                    <div>
+                        <div class="field-row"><span class="label">运维周期:</span> <span class="value">{cycle}</span></div>
+                        <div class="field-row" style="margin-top:12px;"><span class="label">备注说明:</span><br><span class="value">{remark}</span></div>
+                    </div>
+                    <div class="highlight-block highlight-attention" style="margin-top:0;">
+                        <div class="field-row" style="margin-bottom:0;">
+                            <span class="label">本周进度及关注事项:</span><br><br>
+                            <span class="value">{progress_matters}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            """
+            maint_cards.append(card_item)
+            
+        maint_cards.append('</div>')
+        render_html("\n".join(maint_cards))
 
-# ==================== Tab 4：其他事项汇总（过渡保留） ====================
+# ==================== Tab 3：已完结/挂起项目（紧凑卡片流） ====================
+with tab3:
+    with st.spinner("正在拉取【已完结/挂起项目】最新数据..."):
+        df_fin = fetch_feishu_view(TABLE_ID, VIEW_FINISH)
+        
+    if df_fin.empty:
+        st.info("暂无已完结或挂起项目。")
+    else:
+        st.markdown(f"**共计 {len(df_fin)} 个已完结或挂起项目**")
+        st.write("")
+        
+        fin_cards = ['<div class="card-stack">']
+        for _, row in df_fin.iterrows():
+            p_name = row.get("项目名称") or "未命名项目"
+            bu = row.get("BU") or "爱泊车"
+            
+            # 状态字段兼容判断
+            status = row.get("项目状态(完结)") or row.get("项目状态") or "项目结束"
+            remark = fmt_txt(row.get("备注说明"))
+            
+            card_item = f"""
+            <div class="card" style="padding: 20px 24px;">
+                <div class="card-title" style="padding-bottom: 8px; margin-bottom: 12px;">
+                    <span>{p_name} <span class="tag">{bu}</span></span>
+                    <span class="tag tag-muted">{status}</span>
+                </div>
+                <div class="field-row" style="margin-bottom:0;">
+                    <span class="label">备注说明:</span> <span class="value">{remark}</span>
+                </div>
+            </div>
+            """
+            fin_cards.append(card_item)
+            
+        fin_cards.append('</div>')
+        render_html("\n".join(fin_cards))
+
+# ==================== Tab 4：其他事项汇总（待接入） ====================
 with tab4:
-    st.info("其他事项汇总（自研产品、重点专项及客诉分析图表）将在下一步接入。")
+    st.info("💡 接下来准备进入第三步：接入【其他事项汇总】（包含客户服务组、IT组、交付研发组的自研产品计划，以及接诉即办 ECharts 环形图）。")
