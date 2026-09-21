@@ -38,7 +38,7 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局精细化字重与层级样式
+# 3. 注入全局样式与系统自带组件隐藏
 render_html("""
 <style>
 /* 全局微光渐变背景 */
@@ -50,6 +50,20 @@ render_html("""
                 linear-gradient(135deg,#EEF2FF,#F5F8FF 46%,#FAF5FF) !important;
     font-family: 'PingFang SC','SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     color: #334155;
+}
+
+/* ================= 核心：隐藏系统自带顶栏与 Manage app 按钮 ================= */
+header[data-testid="stHeader"] {
+    display: none !important;
+}
+.block-container {
+    padding-top: 1.8rem !important;
+}
+[data-testid="manage-app-button"],
+div[class*="viewerBadge"],
+.viewerBadge_container__1QSob,
+footer {
+    display: none !important;
 }
 
 /* 侧边栏毛玻璃 */
@@ -142,7 +156,7 @@ render_html("""
 /* 悬浮刷新胶囊 */
 button[kind="primary"] {
     position: fixed !important;
-    bottom: 45px !important;
+    bottom: 30px !important;
     right: 28px !important;
     z-index: 99999 !important;
     border-radius: 99px !important;
@@ -164,7 +178,7 @@ button[kind="primary"]:hover {
     background: linear-gradient(135deg, #4338CA, #1D4ED8) !important;
 }
 
-/* 🎯 重点汇报行：柔和蓝紫微光背景，字重平实不刺眼 */
+/* 🎯 重点汇报行：温和蓝紫聚焦 */
 .target-highlight {
     color: #3730A3 !important;
     font-weight: 500 !important;
@@ -227,7 +241,6 @@ button[kind="primary"]:hover {
 }
 .card:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(15,23,42,.08); }
 
-/* 项目标题加粗突出 */
 .card-title {
     font-size: 20px;
     font-weight: 700;
@@ -250,7 +263,6 @@ button[kind="primary"]:hover {
 }
 .block-title { margin: 0 0 16px; font-size: 20px; font-weight: 700; color: #0F172A; }
 
-/* 胶囊标签降重 */
 .tag {
     display: inline-block;
     padding: 2px 10px;
@@ -264,7 +276,6 @@ button[kind="primary"]:hover {
 .tag-success { color: #065F46; background: #ECFDF5; border-color: #A7F3D0; }
 .tag-muted { color: #475569; background: #F1F5F9; border-color: #CBD5E1; }
 
-/* 进度条文字降重 */
 .progress-wrapper { margin: 14px 0 10px; }
 .progress-header { display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; color: #64748B; margin-bottom: 6px; }
 .progress-header span:last-child { font-weight: 600; color: #1E293B; }
@@ -283,7 +294,6 @@ button[kind="primary"]:hover {
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
 @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
 
-/* 核心优化：正文字体全部转为常规 400，字段标签改为半粗 600 */
 .field-row {
     margin-bottom: 12px;
     font-size: 14.5px;
@@ -304,14 +314,12 @@ button[kind="primary"]:hover {
     font-size: 14.5px;
 }
 
-/* 高亮区块排版 */
 .highlight-block { padding: 14px 16px; border-radius: 14px; background: rgba(248,250,252,.92); border: 1px solid #E2E8F0; border-left: 4px solid #6366F1; }
 .highlight-attention { border-color: #BFDBFE; border-left: 4px solid #2563EB; background: #F8FAFC; }
 .highlight-attention .label { color: #1D4ED8; }
 .highlight-plan { border-color: #BBF7D0; border-left: 4px solid #059669; background: #F8FCF9; }
 .highlight-plan .label { color: #047857; }
 
-/* 风险文本专区 */
 .risk-text {
     display: block;
     margin-top: 6px;
