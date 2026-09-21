@@ -38,7 +38,7 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局样式与重点行高亮样式
+# 3. 注入全局样式与温和高亮样式
 render_html("""
 <style>
 .stApp {
@@ -155,18 +155,18 @@ button[kind="primary"]:hover {
     background: linear-gradient(135deg, #4338CA, #1D4ED8) !important;
 }
 
-/* 🎯 重点汇报行视觉高亮 */
+/* 🎯 重点汇报行温和聚焦样式（蓝紫调，与红色风险项区隔） */
 .target-highlight {
-    color: #DC2626 !important;
-    font-weight: 800 !important;
-    background: #FEF2F2 !important;
-    border: 1px solid #FECACA !important;
-    border-left: 4px solid #DC2626 !important;
-    padding: 4px 10px !important;
+    color: #3730A3 !important;
+    font-weight: 700 !important;
+    background: #EEF2FF !important;
+    border: 1px solid #C7D2FE !important;
+    border-left: 4px solid #6366F1 !important;
+    padding: 3px 10px !important;
     margin: 4px 0 !important;
     border-radius: 6px !important;
     display: inline-block !important;
-    box-shadow: 0 1px 4px rgba(220, 38, 38, 0.08) !important;
+    box-shadow: 0 1px 4px rgba(99, 102, 241, 0.08) !important;
     line-height: 1.6 !important;
 }
 .risk-text .target-highlight {
@@ -291,13 +291,13 @@ button[kind="primary"]:hover {
 </style>
 """)
 
-# 4. 原生零报错防 nan 函数（杜绝对 list/dict 调用 pd.isna）
+# 4. 原生零报错防 nan 函数
 def is_null_or_nan(val):
     if val is None:
         return True
     if isinstance(val, (list, dict, tuple, set)):
         return False
-    if isinstance(val, float) and val != val:  # IEEE 754 规定 NaN 不等于自身
+    if isinstance(val, float) and val != val:
         return True
     s = str(val).strip().lower()
     if s in ["nan", "none", "null", "<na>", "undefined", ""]:
@@ -319,7 +319,7 @@ def fmt_txt(val, default="-"):
         if not line:
             continue
         if line == "🎯":
-            formatted.append('<span class="target-highlight">🎯 (重点跟进事项)</span>')
+            formatted.append('<span class="target-highlight">🎯 (重点汇报)</span>')
         elif "🎯" in line:
             formatted.append(f'<span class="target-highlight">{line}</span>')
         else:
@@ -569,7 +569,7 @@ if selected_tab == "📦 交付中项目":
     else:
         render_html(f'<div class="tab-summary-badge">共计 <strong>{len(df_del)}</strong> 个交付中项目</div>')
         
-        # 精准匹配：交付内容 取第二列“交付内容”，已完成事项 取标红的第三列“已完成事项”
+        # 交付内容 取第二列，已完成事项 取标红第三列
         col_c_desc = find_column(df_del, ["交付内容", "交付范围", "建设内容", "内容"])
         col_c_done = find_column(df_del, ["已完成事项", "已完成工作", "已完成", "完成事项"])
         
@@ -582,7 +582,6 @@ if selected_tab == "📦 交付中项目":
             c_sign = fmt_txt(row.get("合同签订时间"))
             c_acc = fmt_txt(row.get("计划验收时间"))
             
-            # 1:1 精准对应
             raw_desc = row.get(col_c_desc) if col_c_desc else row.get("交付内容")
             raw_done = row.get(col_c_done) if col_c_done else row.get("已完成事项")
             
@@ -626,7 +625,6 @@ if selected_tab == "📦 交付中项目":
         cards_html.append('</div>')
         render_html("\n".join(cards_html))
         
-        # 底部规范说明
         render_html("""
         <div class="card" style="max-width:760px;margin:32px auto 10px;">
             <div class="card-title" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">“项目完成进度”说明</div>
@@ -731,7 +729,6 @@ elif selected_tab == "📑 其他事项汇总":
     for grp in groups_order:
         render_html(f'<h2 class="section-title"><span class="grad-text">{grp}</span></h2>')
         
-        # 1. 交付研发二组：接诉即办图表与落实表
         if grp == "交付研发二组":
             chart_list, plan_list = parse_complaint_data(df_complaint)
             if not chart_list:
@@ -794,7 +791,6 @@ elif selected_tab == "📑 其他事项汇总":
             """)
             continue
 
-        # 2. 其他小组
         grp_cards = ['<div class="card-stack">']
         has_content = False
 
