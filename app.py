@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. 飞书凭据与多表多视图配置
+# 2. 飞书凭据与表格配置
 APP_ID = "cli_aa2529e038f81be3"
 APP_SECRET = "gKBRXaqMIYKGGqc9RkyH0b11V4Dk4PSY"
 APP_TOKEN = "JqHKw49V3izuZKkm9s8ccGwNnmb"
@@ -42,9 +42,10 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局样式与毛玻璃美化
+# 3. 注入全局样式与侧边栏毛玻璃美化
 render_html("""
 <style>
+/* 全局微光渐变背景 */
 .stApp {
     background: radial-gradient(60% 52% at 12% 8%,rgba(99,102,241,.16),transparent 70%),
                 radial-gradient(55% 46% at 90% 6%,rgba(56,189,248,.15),transparent 70%),
@@ -55,6 +56,7 @@ render_html("""
     color: #1E293B;
 }
 
+/* 侧边栏毛玻璃质感 */
 [data-testid="stSidebar"] {
     background: rgba(255, 255, 255, 0.88) !important;
     border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
@@ -78,6 +80,7 @@ render_html("""
     display: block;
 }
 
+/* 侧边栏胶囊导航按钮 */
 [data-testid="stSidebar"] div[data-testid="stRadio"] > div {
     gap: 8px !important;
 }
@@ -115,6 +118,7 @@ render_html("""
     font-weight: 800 !important;
 }
 
+/* 顶部标题与轻量数量标签 */
 .report-header {
     font-size: 28px;
     font-weight: 800;
@@ -135,6 +139,7 @@ render_html("""
     gap: 6px;
 }
 
+/* 右下角悬浮刷新按钮（FAB 胶囊） */
 button[kind="primary"] {
     position: fixed !important;
     bottom: 45px !important;
@@ -159,6 +164,7 @@ button[kind="primary"]:hover {
     background: linear-gradient(135deg, #4338CA, #1D4ED8) !important;
 }
 
+/* 磨砂卡片与基础组件 */
 .section-title {
     font-size: 23px;
     font-weight: 800;
@@ -276,29 +282,27 @@ button[kind="primary"]:hover {
 
 # 4. 全局深度清洗与防 nan 函数
 def safe_val(val, default="-"):
-    if val is None:
+    """清洗单行文本或标签，严格过滤 nan、None、null，防止标签渲染为 nan"""
+    if val is None or pd.isna(val):
         return default
-    if isinstance(val, (list, dict)):
-        return str(val) if val else default
-    try:
-        if pd.isna(val):
-            return default
-    except Exception:
-        pass
     s = str(val).strip()
     if s.lower() in ["nan", "none", "null", "<na>", "undefined", ""]:
         return default
     return s
 
 def fmt_txt(val, default="-"):
+    """清洗多行富文本并转换换行符"""
     s = safe_val(val, default)
     if s == default:
         return default
     return s.replace("\r\n", "<br>").replace("\n", "<br>")
 
 def clean_cell_value(val):
-    if val is None:
+    """清洗飞书特殊对象"""
+    if val is None or pd.isna(val):
         return ""
+    if isinstance(val, dict):
+        return val.get("link") or val.get("url") or val.get("text") or val.get("name") or ""
     if isinstance(val, list):
         texts = []
         for item in val:
@@ -311,16 +315,10 @@ def clean_cell_value(val):
             elif isinstance(item, (str, int, float)):
                 texts.append(str(item))
         return " / ".join(texts) if texts else ""
-    if isinstance(val, dict):
-        return val.get("link") or val.get("url") or val.get("text") or val.get("name") or ""
-    try:
-        if pd.isna(val):
-            return ""
-    except Exception:
-        pass
-    return str(val)
+    return val
 
 def fmt_progress(val):
+    """进度条百分比换算"""
     s = safe_val(val, "")
     if not s:
         return 0.0, "0%"
@@ -420,9 +418,10 @@ def fetch_feishu_view(table_id, view_id=None):
         cleaned_rows.append(row)
     return pd.DataFrame(cleaned_rows)
 
-# ----------------- 5. 全局预加载（Tab 切换 0 延迟） -----------------
+# ----------------- 5. 全局预加载（解决切换 Tab 重复 Loading 的核心） -----------------
 @st.cache_data(ttl=300)
 def load_all_dashboard_data():
+    """预加载所有子表数据，使得 Tab 切换 0 延迟"""
     df_del = fetch_feishu_view(TABLE_LIFE_ID, VIEW_DELIVERY)
     df_maint = fetch_feishu_view(TABLE_LIFE_ID, VIEW_MAINT)
     df_fin = fetch_feishu_view(TABLE_LIFE_ID, VIEW_FINISH)
@@ -443,6 +442,7 @@ def load_all_dashboard_data():
         "complaint": df_complaint
     }
 
+# 页面启动时一次性预载入内存
 with st.spinner("正在同步飞书全量数据..."):
     DATA_HUB = load_all_dashboard_data()
 
@@ -530,7 +530,7 @@ if st.button("🔄 刷新数据", type="primary"):
     st.cache_data.clear()
     st.rerun()
 
-# 页面顶部标题
+# 页面顶部大标题
 render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
 
 # ==================== Tab 1：交付中项目 ====================
@@ -541,9 +541,9 @@ if selected_tab == "📦 交付中项目":
     else:
         render_html(f'<div class="tab-summary-badge">共计 <strong>{len(df_del)}</strong> 个交付中项目</div>')
         
-        # 精准匹配：交付内容 取“交付内容”列；已完成事项 取“已完成事项”列
-        col_c_desc = find_column(df_del, ["交付内容", "交付范围", "建设内容", "内容"])
+        # 智能匹配字段名
         col_c_done = find_column(df_del, ["已完成事项", "已完成工作", "已完成", "完成事项"])
+        col_c_desc = find_column(df_del, ["交付内容", "交付范围", "建设内容"])
         
         cards_html = ['<div class="card-stack">']
         for _, row in df_del.iterrows():
@@ -554,12 +554,12 @@ if selected_tab == "📦 交付中项目":
             c_sign = fmt_txt(row.get("合同签订时间"))
             c_acc = fmt_txt(row.get("计划验收时间"))
             
-            # 字段精准归位：交付内容展示第二列，已完成事项展示标红第三列
-            raw_desc = row.get(col_c_desc) if col_c_desc else row.get("交付内容")
+            # 核心优化 2：交付内容优先取“已完成事项”
             raw_done = row.get(col_c_done) if col_c_done else row.get("已完成事项")
+            raw_desc = row.get(col_c_desc) if col_c_desc else row.get("交付内容")
             
-            c_desc = fmt_txt(raw_desc)
-            c_done = fmt_txt(raw_done)
+            c_desc = fmt_txt(raw_done or raw_desc)
+            c_done = fmt_txt(raw_desc if (raw_desc and raw_desc != raw_done) else "-")
             
             s_prog = fmt_txt(row.get("项目进度-软件侧"))
             h_prog = fmt_txt(row.get("项目进度-硬件侧"))
@@ -628,6 +628,7 @@ elif selected_tab == "🔧 运维中项目":
         maint_cards = ['<div class="card-stack">']
         for _, row in df_maint.iterrows():
             p_name = safe_val(row.get("项目名称"), "未命名项目")
+            # 核心优化 3：严格过滤 nan
             bu = safe_val(row.get("BU"), "-")
             s_date = safe_val(row.get("运维开始时间"), "-")
             e_date = safe_val(row.get("运维结束时间"), "-")
