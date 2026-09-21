@@ -3,8 +3,9 @@ import streamlit.components.v1 as components
 import requests
 import pandas as pd
 import json
+import base64
 
-# 1. 页面基本设置
+# 1. 页面基本配置
 st.set_page_config(page_title="全球技术服务中心周报", layout="wide", page_icon="📊")
 
 # 2. 飞书凭据与多表多视图配置
@@ -157,7 +158,7 @@ render_html("""
 .risk-text { display: block; margin-top: 6px; padding: 8px 12px; border-radius: 10px; color: #991B1B; font-weight: 700; font-size: 15px; line-height: 1.5; background: #FEE2E2; border: 1px solid #FCA5A5; }
 .img-container img {
     width: 100%;
-    max-height: 460px;
+    max-height: 480px;
     object-fit: contain;
     border-radius: 16px;
     margin-top: 16px;
@@ -273,99 +274,118 @@ def find_column(df, candidates):
                 return col
     return None
 
+# 尝试抓取图片并转 Base64，防止飞书 CDN 防盗链导致浏览器加载失败
+@st.cache_data(ttl=3600)
+def to_base64_image(img_url):
+    if not img_url or not str(img_url).startswith("http"):
+        return img_url
+    try:
+        res = requests.get(img_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        if res.status_code == 200 and len(res.content) > 200:
+            b64 = base64.b64encode(res.content).decode("utf-8")
+            ctype = res.headers.get("Content-Type", "image/png")
+            return f"data:{ctype};base64,{b64}"
+    except Exception:
+        pass
+    return img_url
+
 def extract_image_url(row, p_title=""):
     default_workorder_img = "https://internal-api-drive-stream.feishu.cn/space/api/box/stream/download/preview/Qt6pbnTeNo3Y9DxuERlcPPAZnIh?extra=%7B%22bitablePerm%22%3A%7B%22tableId%22%3A%22tblYtSIkGK07Na1M%22%2C%22rev%22%3A146%2C%22attachments%22%3A%7B%22fldt82h6VW%22%3A%7B%22recvuTXB4GVwCg%22%3A%5B%22Qt6pbnTeNo3Y9DxuERlcPPAZnIh%22%5D%7D%7D%7D%7D&mount_point=bitable&preview_type=16&version=7685209289593572280"
     for col in ["统计图", "统计图-图片", "图片", "图表"]:
         if col in row and row[col]:
             val = str(row[col]).strip()
             if val.startswith("http://") or val.startswith("https://"):
-                return val
+                return to_base64_image(val)
     if "工单" in p_title:
-        return default_workorder_img
+        return to_base64_image(default_workorder_img)
     return None
 
-# 解析表格 3（部门非交付事项）
+# 解析表格 3（部门非交付事项）精准锁定【负责小组】与【进度及关注事项】
 def parse_non_delivery_data(df):
     if df.empty:
         return {}
-    col_grp = find_column(df, ["负责小组", "小组", "部门", "负责部门", "团队", "组别", "归属", "业务大类", "分类"])
-    col_cnt = find_column(df, ["部门事项汇总", "非交付事项", "事项汇总", "事项内容", "工作内容", "本周事项", "主要工作", "内容", "进展"])
     
-    # 智能启发式兜底匹配
-    if not col_grp:
-        for col in df.columns:
-            sample = "".join([str(x) for x in df[col].dropna()[:5]])
-            if any(k in sample for k in ["客服", "客户", "IT", "it", "数据", "研发"]):
-                col_grp = col
-                break
-    if not col_cnt:
-        lens = {col: df[col].astype(str).map(len).mean() for col in df.columns if col != col_grp}
-        if lens:
-            col_cnt = max(lens, key=lens.get)
-            
+    col_grp = find_column(df, ["负责小组", "小组", "部门", "负责部门", "团队", "组别"])
+    col_cnt = find_column(df, ["进度及关注事项", "本周进度及关注事项", "关注事项", "事项内容", "工作内容", "部门事项汇总", "非交付事项"])
+    
     res = {}
-    if col_grp and col_cnt:
-        for _, r in df.iterrows():
-            g = normalize_group_name(r.get(col_grp))
-            c = r.get(col_cnt)
-            if g and c:
-                clean_c = fmt_txt(c)
-                if g in res:
-                    res[g] += "<br><br>" + clean_c
-                else:
-                    res[g] = clean_c
+    for _, r in df.iterrows():
+        g_raw = r.get(col_grp) if col_grp else ""
+        g = normalize_group_name(g_raw)
+        
+        c_raw = r.get(col_cnt) if col_cnt else ""
+        if not c_raw and "进度及关注事项" in r:
+            c_raw = r.get("进度及关注事项")
+            
+        c_clean = fmt_txt(c_raw)
+        if g and c_clean and c_clean != "-":
+            if g in res:
+                res[g] += "<br><br>" + c_clean
+            else:
+                res[g] = c_clean
     return res
 
-# 解析表格 4（接诉即办专项分析）动态图表与方案
+# 解析表格 4（接诉即办专项分析）动态图表与落实方案
 def parse_complaint_data(df):
     if df.empty:
         return [], []
-    col_area = find_column(df, ["统计月份-区域", "月份-区域", "区域", "月份", "统计月份", "项目", "名称"])
-    if not col_area:
-        col_area = df.columns[0]
-    col_plan = find_column(df, ["改进方案落实情况", "落实情况", "改进方案", "整改方案", "方案", "措施"])
     
-    # 方案表格行
-    plans = []
-    for _, r in df.iterrows():
-        a = str(r.get(col_area, "")).strip()
-        p = str(r.get(col_plan, "")).strip() if col_plan else ""
-        if a and a not in [item["area"] for item in plans]:
-            plans.append({"area": a, "plan": fmt_txt(p) if p else "暂无记录"})
+    col_month = find_column(df, ["统计月份", "月份", "统计月份-区域"])
+    col_area = find_column(df, ["区域", "地区"])
+    col_total = find_column(df, ["客诉总单数", "总单数", "总数"])
+    col_plan = find_column(df, ["改进方案落实情况", "落实情况", "改进方案", "方案", "整改方案"])
+    
+    # 动态匹配所有带“问题”或“归类-”的问题分类列
+    cat_cols = []
+    for col in df.columns:
+        if col in [col_month, col_area, col_total, col_plan]:
+            continue
+        if "问题" in col or "归类" in col:
+            cat_cols.append(col)
             
-    # 图表数据动态识别
-    known_cats = ["算法问题", "运维问题", "设备问题", "人工问题", "无法追溯", "平台问题", "网络问题", "其他问题"]
-    cat_cols = [c for c in df.columns if any(k in c for k in known_cats) and c != col_plan]
-    
     chart_list = []
-    if cat_cols:
-        for _, r in df.iterrows():
-            a = str(r.get(col_area, "")).strip()
-            if not a:
-                continue
-            cats = []
-            for c in cat_cols:
-                try:
-                    val = int(float(str(r.get(c, 0)).strip()))
-                except Exception:
-                    val = 0
-                if val > 0:
-                    cats.append({"name": c, "value": val})
-            if cats:
-                chart_list.append({"name": a, "total": sum(x["value"] for x in cats), "cats": cats})
+    plans = []
+    
+    for _, r in df.iterrows():
+        name = str(r.get(col_month) or r.get(col_area) or "客诉分析").strip()
+        area_name = str(r.get(col_area) or r.get(col_month) or "").strip()
+        
+        try:
+            total = int(float(str(r.get(col_total, 0) or 0).strip()))
+        except Exception:
+            total = 0
+            
+        cats = []
+        for c in cat_cols:
+            clean_cname = c.replace("归类-", "").replace("归类", "").strip()
+            try:
+                v = int(float(str(r.get(c, 0) or 0).strip()))
+            except Exception:
+                v = 0
+            if v > 0:
+                cats.append({"name": clean_cname, "value": v})
                 
-    if not chart_list:
-        col_c_type = find_column(df, ["问题分类", "客诉分类", "分类", "原因分类", "类型"])
-        if col_c_type:
-            for a, grp in df.groupby(col_area):
-                counts = grp[col_c_type].value_counts()
-                cats = [{"name": str(k), "value": int(v)} for k, v in counts.items() if str(k).strip()]
-                if cats:
-                    chart_list.append({"name": str(a), "total": sum(x["value"] for x in cats), "cats": cats})
-                    
+        if total == 0 and cats:
+            total = sum(x["value"] for x in cats)
+            
+        if cats or total > 0:
+            chart_list.append({
+                "name": name,
+                "total": total,
+                "cats": cats
+            })
+            
+        if col_plan:
+            p_txt = str(r.get(col_plan, "")).strip()
+            display_area = name if name else area_name
+            plans.append({
+                "area": display_area,
+                "plan": fmt_txt(p_txt) if p_txt else "暂无记录"
+            })
+            
     return chart_list, plans
 
-# 5. 顶部布局
+# 5. 顶部操作栏
 col_title, col_btn = st.columns([5, 1])
 with col_title:
     render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
@@ -531,7 +551,7 @@ with tab3:
 
 # ==================== Tab 4：其他事项汇总（动态聚合） ====================
 with tab4:
-    with st.spinner("正在从飞书动态同步子表最新数据..."):
+    with st.spinner("正在从飞书子表实时同步最新数据..."):
         # 拉取表格 2：自研产品与重点专项
         df_p = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_PROD)
         df_s = fetch_feishu_view(TABLE_DEV_ID, VIEW_DEV_SPEC)
@@ -558,15 +578,15 @@ with tab4:
     for grp in groups_order:
         render_html(f'<h2 class="section-title"><span class="grad-text">{grp}</span></h2>')
         
-        # 1. 交付研发二组：接诉即办图表与落实方案
+        # 1. 交付研发二组：客诉问题分类统计 (接诉即办) 动态饼图与落实表
         if grp == "交付研发二组":
             chart_list, plan_list = parse_complaint_data(df_complaint)
             
-            # 若表格 4 暂无记录则自动保底展现规范结构
+            # 若表格当前为空则提供默认海淀/昌平样例
             if not chart_list:
                 chart_list = [
-                    {"name": "9月-海淀区", "total": 6, "cats": [{"name": "算法问题", "value": 3}, {"name": "人工问题", "value": 1}, {"name": "运维问题", "value": 1}, {"name": "设备问题", "value": 1}]},
-                    {"name": "9月-昌平区", "total": 4, "cats": [{"name": "算法问题", "value": 1}, {"name": "运维问题", "value": 1}, {"name": "设备问题", "value": 1}, {"name": "无法追溯", "value": 1}]}
+                    {"name": "9月-海淀区", "total": 10, "cats": [{"name": "运维问题", "value": 1}, {"name": "设备问题", "value": 1}, {"name": "算法问题", "value": 8}]},
+                    {"name": "9月-昌平区", "total": 10, "cats": [{"name": "运维问题", "value": 1}, {"name": "设备问题", "value": 1}, {"name": "算法问题", "value": 8}]}
                 ]
             if not plan_list:
                 plan_list = [
@@ -591,7 +611,7 @@ with tab4:
                     box.appendChild(div);
                     var ch = echarts.init(div);
                     ch.setOption({{
-                        color: ['#4F46E5','#0284C7','#7C3AED','#E11D48','#F59E0B','#10B981'],
+                        color: ['#4F46E5','#0284C7','#7C3AED','#E11D48','#F59E0B','#10B981','#64748B'],
                         tooltip: {{ trigger:'item', formatter:'{{b}}: {{c}} 单 ({{d}}%)' }},
                         title: {{ text: item.name + '  共' + item.total + '单', left:'center', top:'43%', textStyle:{{ fontSize:18, fontWeight:800, color:'#0F172A' }} }},
                         series: [{{
@@ -638,7 +658,7 @@ with tab4:
                 next_plan = fmt_txt(drow.get(col_dev_next))
                 img_url = extract_image_url(drow, p_title)
 
-                img_tag_html = f'<div class="img-container"><img src="{img_url}" alt="{p_title}统计图"></div>' if img_url else ''
+                img_tag_html = f'<div class="img-container"><img src="{img_url}" referrerpolicy="no-referrer" alt="{p_title}统计图"></div>' if img_url else ''
 
                 grp_cards.append(f"""
                 <div class="card">
