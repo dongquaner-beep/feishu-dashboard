@@ -79,7 +79,7 @@ GTS_LOGO_SVG = """
 </span>
 """
 
-# 3. 注入全局样式与整洁避让的悬浮按钮 CSS
+# 3. 注入全局样式
 render_html(f"""
 <style>
 /* 全局微光渐变背景 */
@@ -114,7 +114,7 @@ footer {{
     visibility: hidden !important;
 }}
 
-/* ================= 侧边栏结构：精准锁定 {sb_width}px ================= */
+/* ================= 侧边栏结构：锁定 {sb_width}px ================= */
 section[data-testid="stSidebar"] {{
     position: fixed !important;
     top: 0 !important;
@@ -331,7 +331,7 @@ div[class*="st-key-nav_col_"] button[kind="primary"] p {{
     color: #1E293B;
 }}
 
-/* ================= 核心：右下角常驻悬浮刷新胶囊（优雅上浮避让，保持呼吸留白） ================= */
+/* 右下角专属悬浮刷新胶囊（FAB） */
 div.st-key-floating_refresh_btn button {{
     position: fixed !important;
     bottom: 56px !important;
@@ -693,8 +693,8 @@ def fetch_feishu_view(table_id, view_id=None):
         cleaned_rows.append(row)
     return pd.DataFrame(cleaned_rows)
 
-# ----------------- 5. 全局预加载（Tab 切换 0 延迟） -----------------
-@st.cache_data(ttl=300)
+# ----------------- 5. 全局预加载（静音自带的 Running 提示） -----------------
+@st.cache_data(ttl=300, show_spinner=False)
 def load_all_dashboard_data():
     df_del = fetch_feishu_view(TABLE_LIFE_ID, VIEW_DELIVERY)
     df_maint = fetch_feishu_view(TABLE_LIFE_ID, VIEW_MAINT)
@@ -716,8 +716,12 @@ def load_all_dashboard_data():
         "complaint": df_complaint
     }
 
-with st.spinner("正在同步飞书全量数据..."):
-    DATA_HUB = load_all_dashboard_data()
+# ================= 核心：数据常驻 session_state，普通交互 0 秒切无转圈 =================
+if "data_hub" not in st.session_state:
+    with st.spinner("正在同步飞书全量数据..."):
+        st.session_state.data_hub = load_all_dashboard_data()
+
+DATA_HUB = st.session_state.data_hub
 
 # 解析表格 3（部门非交付事项）
 def parse_non_delivery_data(df):
@@ -831,9 +835,11 @@ render_html(f'''
 </div>
 ''')
 
-# ----------------- 8. 右下角专属悬浮刷新胶囊（FAB：上浮避让，保持呼吸间距） -----------------
+# ----------------- 8. 右下角专属悬浮刷新胶囊（点击时才触发真正同步） -----------------
 if st.button("🔄 刷新数据", key="floating_refresh_btn"):
     st.cache_data.clear()
+    if "data_hub" in st.session_state:
+        del st.session_state["data_hub"]
     st.rerun()
 
 # ==================== Tab 1：交付中项目 ====================
