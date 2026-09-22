@@ -13,10 +13,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. 飞书凭据配置（安全读取 Streamlit Secrets 保险箱，兼顾兜底）
-APP_ID = st.secrets.get("APP_ID", "cli_aa2529e038f81be3")
-APP_SECRET = st.secrets.get("APP_SECRET", "gKBRXaqMIYKGGqc9RkyH0b11V4Dk4PSY")
-APP_TOKEN = st.secrets.get("APP_TOKEN", "JqHKw49V3izuZKkm9s8ccGwNnmb")
+# 2. 飞书凭据配置（纯 Secrets 安全读取，代码中零明文）
+try:
+    APP_ID = st.secrets["APP_ID"]
+    APP_SECRET = st.secrets["APP_SECRET"]
+    APP_TOKEN = st.secrets["APP_TOKEN"]
+except Exception:
+    st.error("🚨 未检测到飞书安全凭据配置，请在 Streamlit Cloud 后台的 Settings -> Secrets 中录入密钥！")
+    st.stop()
 
 TABLE_LIFE_ID = "tblfMcfAnXH3luI7"
 VIEW_DELIVERY = "vewSu37vul"    # 交付中项目
