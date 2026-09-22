@@ -55,19 +55,16 @@ def render_html(html_str):
 # 动态计算侧边栏宽度：展开 240px，收起为 68px Mini-Rail
 sb_width = 68 if st.session_state.sidebar_collapsed else 240
 
-# GTS 专属科技矢量图标（全球经纬地球 + 科技轨道脉冲节点）
+# GTS 专属科技矢量徽标
 GTS_LOGO_SVG = """
 <span class="gts-logo-badge">
     <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect width="34" height="34" rx="9" fill="url(#gts_gradient)"/>
-        <!-- 地球外圈 -->
         <circle cx="17" cy="17" r="9" stroke="#FFFFFF" stroke-width="1.6" stroke-opacity="0.95"/>
-        <!-- 经线与纬线 -->
         <ellipse cx="17" cy="17" rx="3.8" ry="9" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.8"/>
         <line x1="8" y1="17" x2="26" y2="17" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.8"/>
         <path d="M10 12.8C12 14.2 14.5 14.8 17 14.8C19.5 14.8 22 14.2 24 12.8" stroke="#FFFFFF" stroke-width="1.1" stroke-opacity="0.6"/>
         <path d="M10 21.2C12 19.8 14.5 19.2 17 19.2C19.5 19.2 22 19.8 24 21.2" stroke="#FFFFFF" stroke-width="1.1" stroke-opacity="0.6"/>
-        <!-- 卫星与科技轨道节点 -->
         <path d="M7 26C11 28.5 23 28.5 27 21" stroke="#38BDF8" stroke-width="1.4" stroke-dasharray="2 2" stroke-linecap="round"/>
         <circle cx="26.5" cy="12.5" r="2.2" fill="#38BDF8"/>
         <circle cx="7.5" cy="21.5" r="1.5" fill="#A5B4FC"/>
@@ -82,7 +79,7 @@ GTS_LOGO_SVG = """
 </span>
 """
 
-# 3. 注入全局样式与几何对齐 CSS
+# 3. 注入全局样式与双层徽章屏蔽机制
 render_html(f"""
 <style>
 /* 全局微光渐变背景 */
@@ -108,6 +105,34 @@ header[data-testid="stHeader"] {{
 [data-testid="stSidebarCollapsedControl"],
 [data-testid="collapsedControl"] {{
     display: none !important;
+}}
+
+/* ================= 核心防御 1：深度通配符屏蔽右下角所有系统级徽章与探针 ================= */
+a[href*="streamlit.io" i],
+a[href*="status" i],
+a[href*="statuspage" i],
+div:has(> a[href*="streamlit.io" i]),
+div:has(> a[href*="status" i]),
+div:has(> a[href*="statuspage" i]),
+*[class*="viewerbadge" i],
+*[class*="statuswidget" i],
+*[class*="status-widget" i],
+*[class*="stStatusWidget" i],
+*[class*="floatingStatus" i],
+[data-testid="manage-app-button"],
+[data-testid="stStatusWidget"],
+[data-testid="stConnectionStatus"],
+iframe[title="Frame"],
+footer {{
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    left: -9999px !important;
+    bottom: -9999px !important;
 }}
 
 /* ================= 侧边栏结构：锁定 {sb_width}px ================= */
@@ -158,7 +183,7 @@ section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{
     line-height: 32px;
 }}
 
-/* ================= 核心修复：收起/展开按钮绝对对齐 ================= */
+/* 收起/展开按钮绝对对齐 */
 div[class*="st-key-toggle_sidebar_btn"] {{
     display: flex !important;
     align-items: center !important;
@@ -211,7 +236,7 @@ div[class*="st-key-toggle_sidebar_btn"] button p {{
     justify-content: center !important;
 }}
 
-/* ================= 展开状态：完整导航胶囊按钮 ================= */
+/* 展开状态导航胶囊 */
 div[class*="st-key-nav_exp_"] button {{
     border-radius: 12px !important;
     padding: 10px 14px !important;
@@ -248,7 +273,7 @@ div[class*="st-key-nav_exp_"] button[kind="primary"] p {{
     font-size: 14.5px !important;
 }}
 
-/* ================= 收起状态：纯单图标大方块（无文字截断、100% 居中） ================= */
+/* 收起状态纯单图标方块（100% 居中，零截断） */
 div[class*="st-key-nav_col_"] button {{
     border-radius: 12px !important;
     padding: 0 !important;
@@ -290,7 +315,7 @@ div[class*="st-key-nav_col_"] button[kind="primary"] p {{
     color: #ffffff !important;
 }}
 
-/* 页面顶部 GTS 科技标题栏 */
+/* 页面顶部 GTS 标题 */
 .block-container {{
     padding-top: 2rem !important;
 }}
@@ -330,23 +355,10 @@ div[class*="st-key-nav_col_"] button[kind="primary"] p {{
     color: #1E293B;
 }}
 
-/* 隐藏外层多余 Manage app 悬浮框与自带状态探针 */
-[data-testid="manage-app-button"],
-[data-testid="stStatusWidget"],
-div[class*="viewerBadge"],
-div[class*="StatusWidget"],
-iframe[title="Frame"],
-footer {{
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-}}
-
-/* ================= 右下角常驻悬浮刷新胶囊（FAB） ================= */
+/* 右下角悬浮刷新胶囊（FAB） */
 div.st-key-floating_refresh_btn button {{
     position: fixed !important;
-    bottom: 40px !important;
+    bottom: 35px !important;
     right: 28px !important;
     z-index: 999999 !important;
     border-radius: 999px !important;
@@ -546,6 +558,35 @@ div.st-key-floating_refresh_btn button p {{
 .ct0 {{ border-bottom: 0 !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }}
 .mt12 {{ margin-top: 10px; }}
 </style>
+""")
+
+# ================= 核心防御 2：主 DOM 探针守护脚本（强力查杀底部徽章） =================
+render_html("""
+<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:none;" onerror="
+(function(){
+    function wipeStreamlitBadges() {
+        try {
+            var badges = document.querySelectorAll('a[href*=\\'streamlit.io\\' i], a[href*=\\'status\\' i], *[class*=\\'viewerbadge\\' i], *[class*=\\'statuswidget\\' i]');
+            badges.forEach(function(el) {
+                var p = el;
+                while (p && p !== document.body && !p.classList.contains('stApp')) {
+                    var s = window.getComputedStyle(p);
+                    if (s.position === 'fixed' || s.position === 'absolute') {
+                        p.style.setProperty('display', 'none', 'important');
+                        p.style.setProperty('visibility', 'hidden', 'important');
+                        p.style.setProperty('opacity', '0', 'important');
+                        break;
+                    }
+                    p = p.parentElement;
+                }
+                el.style.setProperty('display', 'none', 'important');
+            });
+        } catch(e) {}
+    }
+    wipeStreamlitBadges();
+    setInterval(wipeStreamlitBadges, 400);
+})();
+" />
 """)
 
 # 4. 原生零报错防 nan 函数
