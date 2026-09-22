@@ -13,10 +13,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. 飞书凭据与多表多视图配置
-APP_ID = "cli_aa2529e038f81be3"
-APP_SECRET = "gKBRXaqMIYKGGqc9RkyH0b11V4Dk4PSY"
-APP_TOKEN = "JqHKw49V3izuZKkm9s8ccGwNnmb"
+# 2. 飞书凭据配置（安全读取 Streamlit Secrets 保险箱）
+APP_ID = st.secrets.get("APP_ID", "cli_aa2529e038f81be3")
+APP_SECRET = st.secrets.get("APP_SECRET", "gKBRXaqMIYKGGqc9RkyH0b11V4Dk4PSY")
+APP_TOKEN = st.secrets.get("APP_TOKEN", "JqHKw49V3izuZKkm9s8ccGwNnmb")
 
 TABLE_LIFE_ID = "tblfMcfAnXH3luI7"
 VIEW_DELIVERY = "vewSu37vul"    # 交付中项目
