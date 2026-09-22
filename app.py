@@ -52,10 +52,37 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 动态计算侧边栏宽度：展开为 240px，收起为 68px Mini-Rail
+# 动态计算侧边栏宽度：展开 240px，收起为 68px Mini-Rail
 sb_width = 68 if st.session_state.sidebar_collapsed else 240
 
-# 3. 注入全局样式与精致 Mini-Rail 侧边栏 CSS
+# GTS 专属科技矢量图标（全球经纬地球 + 科技轨道脉冲节点）
+GTS_LOGO_SVG = """
+<span class="gts-logo-badge">
+    <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="34" height="34" rx="9" fill="url(#gts_gradient)"/>
+        <!-- 地球外圈 -->
+        <circle cx="17" cy="17" r="9" stroke="#FFFFFF" stroke-width="1.6" stroke-opacity="0.95"/>
+        <!-- 经线与纬线 -->
+        <ellipse cx="17" cy="17" rx="3.8" ry="9" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.8"/>
+        <line x1="8" y1="17" x2="26" y2="17" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.8"/>
+        <path d="M10 12.8C12 14.2 14.5 14.8 17 14.8C19.5 14.8 22 14.2 24 12.8" stroke="#FFFFFF" stroke-width="1.1" stroke-opacity="0.6"/>
+        <path d="M10 21.2C12 19.8 14.5 19.2 17 19.2C19.5 19.2 22 19.8 24 21.2" stroke="#FFFFFF" stroke-width="1.1" stroke-opacity="0.6"/>
+        <!-- 卫星与科技轨道节点 -->
+        <path d="M7 26C11 28.5 23 28.5 27 21" stroke="#38BDF8" stroke-width="1.4" stroke-dasharray="2 2" stroke-linecap="round"/>
+        <circle cx="26.5" cy="12.5" r="2.2" fill="#38BDF8"/>
+        <circle cx="7.5" cy="21.5" r="1.5" fill="#A5B4FC"/>
+        <defs>
+            <linearGradient id="gts_gradient" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#4F46E5"/>
+                <stop offset="0.5" stop-color="#2563EB"/>
+                <stop offset="1" stop-color="#0284C7"/>
+            </linearGradient>
+        </defs>
+    </svg>
+</span>
+"""
+
+# 3. 注入全局样式与几何对齐 CSS
 render_html(f"""
 <style>
 /* 全局微光渐变背景 */
@@ -83,7 +110,7 @@ header[data-testid="stHeader"] {{
     display: none !important;
 }}
 
-/* ================= 侧边栏结构：精准锁定 {sb_width}px ================= */
+/* ================= 侧边栏结构：锁定 {sb_width}px ================= */
 section[data-testid="stSidebar"] {{
     position: fixed !important;
     top: 0 !important;
@@ -131,33 +158,57 @@ section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{
     line-height: 32px;
 }}
 
-/* 展开与收起按钮样式 */
+/* ================= 核心修复：收起/展开按钮绝对对齐 ================= */
+div[class*="st-key-toggle_sidebar_btn"] {{
+    display: flex !important;
+    align-items: center !important;
+    justify-content: {"center" if st.session_state.sidebar_collapsed else "flex-end"} !important;
+    width: 100% !important;
+}}
 div[class*="st-key-toggle_sidebar_btn"] button {{
-    background: #EEF2FF !important;
-    border: 1px solid #C7D2FE !important;
-    color: #4F46E5 !important;
-    border-radius: 8px !important;
-    padding: 0 !important;
+    width: 32px !important;
     height: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
     min-height: 32px !important;
+    max-height: 32px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 8px !important;
+    background: #F1F5F9 !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #475569 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}}
+div[class*="st-key-toggle_sidebar_btn"] button:hover {{
+    background: #EEF2FF !important;
+    border-color: #818CF8 !important;
+    color: #4F46E5 !important;
+    transform: scale(1.05) !important;
+}}
+div[class*="st-key-toggle_sidebar_btn"] button div[data-testid="stMarkdownContainer"] {{
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    box-shadow: 0 2px 6px rgba(79, 70, 229, 0.08) !important;
-}}
-div[class*="st-key-toggle_sidebar_btn"] button:hover {{
-    background: #4F46E5 !important;
-    border-color: #4F46E5 !important;
-    color: #ffffff !important;
-    transform: scale(1.05) !important;
+    width: 100% !important;
+    height: 100% !important;
+    line-height: 1 !important;
 }}
 div[class*="st-key-toggle_sidebar_btn"] button p {{
     font-size: 14px !important;
-    font-weight: 800 !important;
+    font-weight: 700 !important;
     line-height: 1 !important;
     margin: 0 !important;
+    padding: 0 !important;
+    text-align: center !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }}
 
 /* ================= 展开状态：完整导航胶囊按钮 ================= */
@@ -203,7 +254,10 @@ div[class*="st-key-nav_col_"] button {{
     padding: 0 !important;
     width: 46px !important;
     height: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
     min-height: 46px !important;
+    max-height: 46px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -236,7 +290,7 @@ div[class*="st-key-nav_col_"] button[kind="primary"] p {{
     color: #ffffff !important;
 }}
 
-/* 页面顶部标题与排版 */
+/* 页面顶部 GTS 科技标题栏 */
 .block-container {{
     padding-top: 2rem !important;
 }}
@@ -244,11 +298,23 @@ div[class*="st-key-nav_col_"] button[kind="primary"] p {{
     font-size: 26px;
     font-weight: 700;
     margin-bottom: 6px;
+    display: inline-flex;
+    align-items: center;
+}}
+.report-header-text {{
     background: linear-gradient(120deg,#4338CA,#0284C7 50%,#7C3AED);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     display: inline-block;
+}}
+.gts-logo-badge {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    margin-right: 12px;
+    filter: drop-shadow(0 4px 10px rgba(79, 70, 229, 0.28));
 }}
 .tab-summary-badge {{
     font-size: 14px;
@@ -277,7 +343,7 @@ footer {{
     pointer-events: none !important;
 }}
 
-/* ================= 核心：右下角专属悬浮刷新胶囊（FAB） ================= */
+/* ================= 右下角常驻悬浮刷新胶囊（FAB） ================= */
 div.st-key-floating_refresh_btn button {{
     position: fixed !important;
     bottom: 40px !important;
@@ -738,12 +804,12 @@ def parse_complaint_data(df):
 # ----------------- 6. 侧边栏：状态化 240px 展开 / 68px 纯图标坞 -----------------
 with st.sidebar:
     if not st.session_state.sidebar_collapsed:
-        # A. 展开模式：完整标题 + 优雅的收起小按钮 ❮
+        # A. 展开模式：标题 + 精致对齐的收起按钮 «
         c_title, c_toggle = st.columns([3.8, 1.2])
         with c_title:
             render_html('<span class="sidebar-title">GTS 周会汇报</span>')
         with c_toggle:
-            if st.button("❮", key="toggle_sidebar_btn", help="收起导航为图标模式"):
+            if st.button("«", key="toggle_sidebar_btn", help="收起导航为图标模式"):
                 st.session_state.sidebar_collapsed = True
                 st.rerun()
         
@@ -754,8 +820,8 @@ with st.sidebar:
                 st.session_state.active_tab_idx = i
                 st.rerun()
     else:
-        # B. 收起模式：居中展开小胶囊 ❯ + 纯粹单图标（100% 居中，零截断）
-        if st.button("❯", key="toggle_sidebar_btn", help="展开完整导航", use_container_width=True):
+        # B. 收起模式：居中对齐展开按钮 » + 纯粹单图标（100% 居中，零截断）
+        if st.button("»", key="toggle_sidebar_btn", help="展开完整导航"):
             st.session_state.sidebar_collapsed = False
             st.rerun()
             
@@ -769,8 +835,13 @@ with st.sidebar:
 # 当前激活板块 ID
 current_tab_id = NAV_TABS[st.session_state.active_tab_idx]["id"]
 
-# ----------------- 7. 页面顶部纯净大标题 -----------------
-render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
+# ----------------- 7. 页面顶部纯净大标题（内嵌 GTS 科技矢量徽标） -----------------
+render_html(f'''
+<div class="report-header">
+    {GTS_LOGO_SVG}
+    <span class="report-header-text">GTS 部门周会汇报大屏</span>
+</div>
+''')
 
 # ----------------- 8. 右下角常驻悬浮刷新胶囊（FAB） -----------------
 if st.button("🔄 刷新数据", key="floating_refresh_btn"):
