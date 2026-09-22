@@ -5,7 +5,7 @@ import pandas as pd
 import json
 import base64
 
-# 1. 页面基本配置（默认展开左侧导航）
+# 1. 页面基本配置
 st.set_page_config(
     page_title="全球技术服务中心周报",
     layout="wide",
@@ -38,7 +38,7 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局样式与支持收起/展开的侧边栏美化
+# 3. 注入全局样式与“收起保留 72px 宽度”的核心 CSS
 render_html("""
 <style>
 /* 全局微光渐变背景 */
@@ -52,69 +52,137 @@ render_html("""
     color: #334155;
 }
 
-/* 顶栏透明化，隐藏右上角无用菜单，但释放左上角展开按钮 */
+/* 顶栏背景设为透明，只隐藏无用工具栏 */
 header[data-testid="stHeader"] {
     background: transparent !important;
-    pointer-events: none !important;
 }
 [data-testid="stToolbar"],
 [data-testid="stDecoration"] {
     display: none !important;
-    visibility: hidden !important;
 }
 
-/* ================= 核心修复：收起后，左上角展开按钮（>）美化为毛玻璃悬浮按钮 ================= */
+/* ================= 核心：侧边栏展开与收起保留 72px 宽度的 CSS 实现 ================= */
+
+/* 1. 展开状态：宽度 250px */
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"][aria-expanded="true"] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 250px !important;
+    min-width: 250px !important;
+    max-width: 250px !important;
+    transform: none !important;
+    margin-left: 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 100 !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
+    backdrop-filter: blur(22px) saturate(180%) !important;
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.05) !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    overflow-x: hidden !important;
+}
+
+/* 2. 收起状态：保留 72px 宽度，展示极简图标导航 */
+section[data-testid="stSidebar"][aria-expanded="false"] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 72px !important;
+    min-width: 72px !important;
+    max-width: 72px !important;
+    transform: none !important;
+    margin-left: 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 100 !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
+    backdrop-filter: blur(22px) saturate(180%) !important;
+    box-shadow: 4px 0 20px rgba(15, 23, 42, 0.05) !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    overflow-x: hidden !important;
+}
+
+/* 收起状态下的标题隐藏 */
+section[data-testid="stSidebar"][aria-expanded="false"] .sidebar-title {
+    display: none !important;
+}
+
+/* 收起状态下内边距与菜单项居中变成正方形小胶囊 */
+section[data-testid="stSidebar"][aria-expanded="false"] [data-testid="stSidebarUserContent"] {
+    padding: 64px 8px 16px 8px !important;
+}
+section[data-testid="stSidebar"][aria-expanded="false"] div[data-testid="stRadio"] label {
+    width: 48px !important;
+    height: 48px !important;
+    padding: 0 !important;
+    margin: 0 auto 10px auto !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+section[data-testid="stSidebar"][aria-expanded="false"] div[data-testid="stRadio"] label p {
+    font-size: 20px !important;
+    line-height: 1 !important;
+    overflow: hidden !important;
+    width: 26px !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+}
+
+/* 主内容区域跟随侧边栏平滑避让 */
+.stApp:has(section[data-testid="stSidebar"][aria-expanded="false"]) .main,
+.stApp:has(section[data-testid="stSidebar"][aria-expanded="false"]) [data-testid="stMain"] {
+    margin-left: 72px !important;
+    width: calc(100% - 72px) !important;
+    max-width: calc(100% - 72px) !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.stApp:has(section[data-testid="stSidebar"][aria-expanded="true"]) .main,
+.stApp:has(section[data-testid="stSidebar"][aria-expanded="true"]) [data-testid="stMain"] {
+    margin-left: 250px !important;
+    width: calc(100% - 250px) !important;
+    max-width: calc(100% - 250px) !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 收起时常驻在 72px 顶部的展开按钮（>） */
 [data-testid="stSidebarCollapsedControl"] {
     display: flex !important;
     visibility: visible !important;
-    pointer-events: auto !important;
     position: fixed !important;
     top: 14px !important;
     left: 14px !important;
-    z-index: 999999 !important;
+    z-index: 1000 !important;
 }
 [data-testid="stSidebarCollapsedControl"] button {
-    background: rgba(255, 255, 255, 0.95) !important;
-    border: 1px solid #C7D2FE !important;
+    width: 44px !important;
+    height: 38px !important;
     border-radius: 10px !important;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08) !important;
-    color: #4338CA !important;
-    transition: all 0.2s ease !important;
-}
-[data-testid="stSidebarCollapsedControl"] button:hover {
     background: #EEF2FF !important;
-    border-color: #818CF8 !important;
-    transform: scale(1.05) !important;
+    border: 1px solid #C7D2FE !important;
+    color: #4338CA !important;
 }
 
-/* 侧边栏内部收起箭头按钮（◀）美化 */
-[data-testid="stSidebarCollapseButton"] {
-    display: flex !important;
-    visibility: visible !important;
-}
+/* 侧边栏内部展开时的收起小箭头（◀） */
 [data-testid="stSidebarCollapseButton"] button {
     background: #EEF2FF !important;
     border: 1px solid #C7D2FE !important;
     border-radius: 8px !important;
     color: #4338CA !important;
-    transition: all 0.2s ease !important;
-}
-[data-testid="stSidebarCollapseButton"] button:hover {
-    background: #E0E7FF !important;
-    color: #3730A3 !important;
 }
 
-/* 侧边栏毛玻璃与宽度设置（允许平滑折叠） */
-[data-testid="stSidebar"] {
-    min-width: 250px !important;
-    max-width: 260px !important;
-    background: rgba(255, 255, 255, 0.88) !important;
-    border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
-    backdrop-filter: blur(22px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
-    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.05) !important;
-}
-[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+/* 侧边栏标题与菜单项通用样式 */
+[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarUserContent"] {
     padding: 24px 14px !important;
 }
 .sidebar-title {
@@ -128,9 +196,8 @@ header[data-testid="stHeader"] {
     background-clip: text;
     color: transparent;
     display: block;
+    white-space: nowrap;
 }
-
-/* 侧边栏菜单胶囊 */
 [data-testid="stSidebar"] div[data-testid="stRadio"] > div {
     gap: 8px !important;
 }
@@ -172,7 +239,6 @@ header[data-testid="stHeader"] {
 .report-header {
     font-size: 26px;
     font-weight: 700;
-    margin-bottom: 6px;
     background: linear-gradient(120deg,#4338CA,#0284C7 50%,#7C3AED);
     -webkit-background-clip: text;
     background-clip: text;
@@ -193,45 +259,21 @@ header[data-testid="stHeader"] {
     color: #1E293B;
 }
 
-/* 隐藏右下角 Manage app 悬浮框与底栏徽章 */
-.block-container {
-    padding-top: 1.8rem !important;
-}
-[data-testid="manage-app-button"],
-[data-testid="stStatusWidget"],
-div[class*="viewerBadge"],
-div[class*="StatusWidget"],
-iframe[title="Frame"],
-footer {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
-
-/* 悬浮刷新胶囊 */
-button[kind="primary"] {
-    position: fixed !important;
-    bottom: 45px !important;
-    right: 28px !important;
-    z-index: 99999 !important;
-    border-radius: 99px !important;
-    padding: 8px 18px !important;
-    font-size: 13px !important;
+/* 顶部刷新按钮样式微调 */
+button[key="top_refresh_btn"] {
+    border-radius: 12px !important;
+    font-size: 14px !important;
     font-weight: 600 !important;
-    background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.5) !important;
-    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35) !important;
-    backdrop-filter: blur(10px) !important;
-    cursor: pointer !important;
+    background: #ffffff !important;
+    color: #4338CA !important;
+    border: 1px solid #C7D2FE !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
     transition: all 0.2s ease !important;
-    width: auto !important;
 }
-button[kind="primary"]:hover {
-    transform: translateY(-2px) scale(1.02) !important;
-    box-shadow: 0 10px 24px rgba(79, 70, 229, 0.45) !important;
-    background: linear-gradient(135deg, #4338CA, #1D4ED8) !important;
+button[key="top_refresh_btn"]:hover {
+    background: #EEF2FF !important;
+    border-color: #818CF8 !important;
+    color: #3730A3 !important;
 }
 
 /* 🎯 重点汇报行：温和蓝紫聚焦 */
@@ -659,7 +701,7 @@ def parse_complaint_data(df):
             
     return chart_list, plans
 
-# ----------------- 6. 侧边栏导航（纯净目录，无多余按钮） -----------------
+# ----------------- 6. 侧边栏导航 -----------------
 with st.sidebar:
     render_html('<span class="sidebar-title">GTS 周会汇报</span>')
     selected_tab = st.radio(
@@ -668,13 +710,14 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-# 右下角悬浮刷新按钮
-if st.button("🔄 刷新数据", type="primary", key="fab_sync_btn"):
-    st.cache_data.clear()
-    st.rerun()
-
-# 页面顶部标题
-render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
+# ----------------- 7. 顶部操作栏（刷新按钮移到标题右侧，避开右下角） -----------------
+col_title, col_btn = st.columns([5, 1])
+with col_title:
+    render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
+with col_btn:
+    if st.button("🔄 刷新最新数据", key="top_refresh_btn", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
 # ==================== Tab 1：交付中项目 ====================
 if selected_tab == "📦 交付中项目":
