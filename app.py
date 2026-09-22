@@ -52,49 +52,53 @@ render_html("""
     color: #334155;
 }
 
-/* ================= 核心修复：保持 Header 透明悬浮，只隐藏右上角杂项，保留左上角展开按钮 ================= */
+/* ================= 核心修复：顶栏保持透明，仅隐藏右上角工具菜单，释放左上角展开按钮 ================= */
 header[data-testid="stHeader"] {
     background: transparent !important;
-    pointer-events: none !important;
+    color: #4338CA !important;
 }
 
-/* 彻底隐藏右上角系统工具（Share、三点菜单、编辑、彩条等） */
+/* 仅精准隐藏右上角杂项工具栏（Share、三点菜单、GitHub 等） */
 [data-testid="stToolbar"],
 [data-testid="stDecoration"] {
     display: none !important;
     visibility: hidden !important;
 }
 
-/* 核心：美化左上角侧边栏展开图标，确保可点击并带有毛玻璃效果 */
-[data-testid="stSidebarCollapsedControl"] {
+/* 核心修复：美化并置顶左上角侧边栏展开图标，确保随时可见且可点击 */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"] {
     display: flex !important;
     visibility: visible !important;
+    opacity: 1 !important;
     pointer-events: auto !important;
     position: fixed !important;
     top: 14px !important;
     left: 14px !important;
     z-index: 999999 !important;
-    background: rgba(255, 255, 255, 0.92) !important;
-    border: 1px solid #C7D2FE !important;
+    width: 38px !important;
+    height: 38px !important;
     border-radius: 10px !important;
-    padding: 6px 8px !important;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08) !important;
+    border: 1px solid #C7D2FE !important;
+    background: rgba(255, 255, 255, 0.95) !important;
     backdrop-filter: blur(12px) !important;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1) !important;
     color: #4338CA !important;
     cursor: pointer !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
 }
-[data-testid="stSidebarCollapsedControl"] button {
-    color: #4338CA !important;
-    pointer-events: auto !important;
-}
-[data-testid="stSidebarCollapsedControl"]:hover {
+[data-testid="stSidebarCollapsedControl"]:hover,
+[data-testid="collapsedControl"]:hover {
     background: #EEF2FF !important;
     border-color: #818CF8 !important;
+    transform: scale(1.05) !important;
 }
 
-/* 隐藏右下角 Manage app 悬浮框及底栏徽章 */
+/* 隐藏底栏多余徽章与 Manage app 按钮 */
 .block-container {
-    padding-top: 1.8rem !important;
+    padding-top: 2rem !important;
 }
 [data-testid="manage-app-button"],
 [data-testid="stStatusWidget"],
@@ -195,10 +199,10 @@ footer {
     color: #1E293B;
 }
 
-/* 悬浮刷新胶囊（调整位置避让底角） */
+/* 悬浮刷新胶囊 */
 button[kind="primary"] {
     position: fixed !important;
-    bottom: 50px !important;
+    bottom: 45px !important;
     right: 28px !important;
     z-index: 99999 !important;
     border-radius: 99px !important;
@@ -645,7 +649,7 @@ def parse_complaint_data(df):
             
     return chart_list, plans
 
-# ----------------- 6. 侧边栏导航与自动展开保障 -----------------
+# ----------------- 6. 侧边栏导航与双刷新按钮配置 -----------------
 with st.sidebar:
     render_html('<span class="sidebar-title">GTS 周会汇报</span>')
     selected_tab = st.radio(
@@ -662,32 +666,6 @@ with st.sidebar:
 if st.button("🔄 刷新数据", type="primary", key="fab_sync_btn"):
     st.cache_data.clear()
     st.rerun()
-
-# 页面顶部自动展开侧边栏保障脚本 + 隐藏第三方徽章
-components.html("""
-<script>
-function initDashboard() {
-    try {
-        const d = window.top.document;
-        // 1. 如果侧边栏处于收起状态，自动点击展开按钮，确保首次进入必展开
-        const expandBtn = d.querySelector('[data-testid="stSidebarCollapsedControl"] button, button[aria-label="Open sidebar"]');
-        const sidebar = d.querySelector('[data-testid="stSidebar"]');
-        if (sidebar && sidebar.getAttribute('aria-expanded') === 'false' && expandBtn) {
-            expandBtn.click();
-        }
-        
-        // 2. 隐藏外层第三方徽章
-        d.querySelectorAll('[data-testid="manage-app-button"], [href*="streamlit.io"], iframe[title="Frame"], div[class*="viewerBadge"], div[class*="StatusWidget"]').forEach(el => {
-            el.style.setProperty('display', 'none', 'important');
-            el.style.setProperty('visibility', 'hidden', 'important');
-            el.style.setProperty('opacity', '0', 'important');
-        });
-    } catch (e) {}
-}
-setTimeout(initDashboard, 300);
-setTimeout(initDashboard, 1000);
-</script>
-""", height=0, width=0)
 
 # 页面顶部标题
 render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
