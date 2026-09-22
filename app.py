@@ -5,7 +5,7 @@ import pandas as pd
 import json
 import base64
 
-# 1. 页面基本配置
+# 1. 页面基本配置（默认展开左侧导航）
 st.set_page_config(
     page_title="全球技术服务中心周报",
     layout="wide",
@@ -38,7 +38,7 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局样式（锁定左侧导航栏常驻）
+# 3. 注入全局样式与支持收起/展开的侧边栏美化
 render_html("""
 <style>
 /* 全局微光渐变背景 */
@@ -52,65 +52,68 @@ render_html("""
     color: #334155;
 }
 
-/* ================= 核心修复：强制侧边栏常驻显示在屏幕左侧（260px），无视折叠状态 ================= */
-[data-testid="stSidebar"],
-section[data-testid="stSidebar"],
-section[data-testid="stSidebar"][aria-expanded="false"] {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    bottom: 0 !important;
-    width: 260px !important;
-    min-width: 260px !important;
-    max-width: 260px !important;
-    transform: none !important;
-    margin-left: 0 !important;
-    display: block !important;
+/* 顶栏透明化，隐藏右上角无用菜单，但释放左上角展开按钮 */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    pointer-events: none !important;
+}
+[data-testid="stToolbar"],
+[data-testid="stDecoration"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* ================= 核心修复：收起后，左上角展开按钮（>）美化为毛玻璃悬浮按钮 ================= */
+[data-testid="stSidebarCollapsedControl"] {
+    display: flex !important;
     visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 100 !important;
-    background: rgba(255, 255, 255, 0.9) !important;
+    pointer-events: auto !important;
+    position: fixed !important;
+    top: 14px !important;
+    left: 14px !important;
+    z-index: 999999 !important;
+}
+[data-testid="stSidebarCollapsedControl"] button {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid #C7D2FE !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08) !important;
+    color: #4338CA !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stSidebarCollapsedControl"] button:hover {
+    background: #EEF2FF !important;
+    border-color: #818CF8 !important;
+    transform: scale(1.05) !important;
+}
+
+/* 侧边栏内部收起箭头按钮（◀）美化 */
+[data-testid="stSidebarCollapseButton"] {
+    display: flex !important;
+    visibility: visible !important;
+}
+[data-testid="stSidebarCollapseButton"] button {
+    background: #EEF2FF !important;
+    border: 1px solid #C7D2FE !important;
+    border-radius: 8px !important;
+    color: #4338CA !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stSidebarCollapseButton"] button:hover {
+    background: #E0E7FF !important;
+    color: #3730A3 !important;
+}
+
+/* 侧边栏毛玻璃与宽度设置（允许平滑折叠） */
+[data-testid="stSidebar"] {
+    min-width: 250px !important;
+    max-width: 260px !important;
+    background: rgba(255, 255, 255, 0.88) !important;
     border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
     backdrop-filter: blur(22px) saturate(180%) !important;
     -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
     box-shadow: 4px 0 24px rgba(15, 23, 42, 0.05) !important;
 }
-
-/* 核心修复：主内容区域右移 260px，完美避让侧边栏，两者并排排列 */
-[data-testid="stMain"],
-.main {
-    margin-left: 260px !important;
-    width: calc(100% - 260px) !important;
-    max-width: calc(100% - 260px) !important;
-}
-
-/* 隐藏容易误触的收起箭头与原生顶栏 */
-header[data-testid="stHeader"],
-[data-testid="stSidebarCollapseButton"],
-[data-testid="stSidebarCollapsedControl"],
-[data-testid="collapsedControl"],
-button[aria-label="Close sidebar"],
-button[aria-label="Collapse sidebar"] {
-    display: none !important;
-}
-
-/* 隐藏右下角底栏多余徽章 */
-.block-container {
-    padding-top: 2rem !important;
-}
-[data-testid="manage-app-button"],
-[data-testid="stStatusWidget"],
-div[class*="viewerBadge"],
-div[class*="StatusWidget"],
-iframe[title="Frame"],
-footer {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
-
-/* 侧边栏标题与内边距 */
 [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
     padding: 24px 14px !important;
 }
@@ -190,10 +193,26 @@ footer {
     color: #1E293B;
 }
 
+/* 隐藏右下角 Manage app 悬浮框与底栏徽章 */
+.block-container {
+    padding-top: 1.8rem !important;
+}
+[data-testid="manage-app-button"],
+[data-testid="stStatusWidget"],
+div[class*="viewerBadge"],
+div[class*="StatusWidget"],
+iframe[title="Frame"],
+footer {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
 /* 悬浮刷新胶囊 */
 button[kind="primary"] {
     position: fixed !important;
-    bottom: 35px !important;
+    bottom: 45px !important;
     right: 28px !important;
     z-index: 99999 !important;
     border-radius: 99px !important;
@@ -640,7 +659,7 @@ def parse_complaint_data(df):
             
     return chart_list, plans
 
-# ----------------- 6. 侧边栏导航（常驻固定展示） -----------------
+# ----------------- 6. 侧边栏导航（纯净目录，无多余按钮） -----------------
 with st.sidebar:
     render_html('<span class="sidebar-title">GTS 周会汇报</span>')
     selected_tab = st.radio(
@@ -648,10 +667,6 @@ with st.sidebar:
         options=["📦 交付中项目", "🔧 运维中项目", "🏁 已完结/挂起项目", "📑 其他事项汇总"],
         label_visibility="collapsed"
     )
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🔄 同步飞书最新数据", key="sidebar_sync_btn", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
 
 # 右下角悬浮刷新按钮
 if st.button("🔄 刷新数据", type="primary", key="fab_sync_btn"):
