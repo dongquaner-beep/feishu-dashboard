@@ -33,16 +33,32 @@ VIEW_NON_DEL = "vewCXHSZWx"
 TABLE_COMPLAINT_ID = "tblGj9QwAXsYOOrn"
 VIEW_COMPLAINT = "vewiedoaqM"
 
-# 安全渲染 HTML 辅助函数
+# 导航菜单配置
+NAV_TABS = [
+    {"id": "delivery", "label": "📦 交付中项目", "icon": "📦"},
+    {"id": "maint", "label": "🔧 运维中项目", "icon": "🔧"},
+    {"id": "finish", "label": "🏁 已完结/挂起项目", "icon": "🏁"},
+    {"id": "other", "label": "📑 其他事项汇总", "icon": "📑"},
+]
+
+# 初始化侧边栏状态与选中项
+if "sidebar_collapsed" not in st.session_state:
+    st.session_state.sidebar_collapsed = False
+if "active_tab_idx" not in st.session_state:
+    st.session_state.active_tab_idx = 0
+
+# 安全渲染 HTML
 def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局样式与“收起保留 72px 宽度”的核心 CSS
-render_html("""
+# 3. 动态注入布局 CSS（根据展开/收起状态精准匹配 250px 或 72px）
+sidebar_width = 72 if st.session_state.sidebar_collapsed else 250
+
+render_html(f"""
 <style>
-/* 全局微光渐变背景 */
-.stApp {
+/* 全局背景 */
+.stApp {{
     background: radial-gradient(60% 52% at 12% 8%,rgba(99,102,241,.14),transparent 70%),
                 radial-gradient(55% 46% at 90% 6%,rgba(56,189,248,.13),transparent 70%),
                 radial-gradient(58% 50% at 92% 92%,rgba(168,85,247,.13),transparent 70%),
@@ -50,193 +66,140 @@ render_html("""
                 linear-gradient(135deg,#EEF2FF,#F5F8FF 46%,#FAF5FF) !important;
     font-family: 'PingFang SC','SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     color: #334155;
-}
+}}
 
-/* 顶栏背景设为透明，只隐藏无用工具栏 */
-header[data-testid="stHeader"] {
+/* 顶栏设为透明，屏蔽右上角无用杂项菜单 */
+header[data-testid="stHeader"] {{
     background: transparent !important;
-}
-[data-testid="stToolbar"],
-[data-testid="stDecoration"] {
+    pointer-events: none !important;
+}}
+[data-testid="stToolbar"], [data-testid="stDecoration"] {{
     display: none !important;
-}
+}}
 
-/* ================= 核心：侧边栏展开与收起保留 72px 宽度的 CSS 实现 ================= */
+/* 隐藏 Streamlit 原生展开收起按钮，改用我们自定义的稳定按钮 */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"] {{
+    display: none !important;
+}}
 
-/* 1. 展开状态：宽度 250px */
-section[data-testid="stSidebar"],
-section[data-testid="stSidebar"][aria-expanded="true"] {
+/* ================= 侧边栏绝对锁定：宽度 {sidebar_width}px，无视原生推挤 ================= */
+section[data-testid="stSidebar"] {{
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     bottom: 0 !important;
-    width: 250px !important;
-    min-width: 250px !important;
-    max-width: 250px !important;
+    width: {sidebar_width}px !important;
+    min-width: {sidebar_width}px !important;
+    max-width: {sidebar_width}px !important;
     transform: none !important;
     margin-left: 0 !important;
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    z-index: 100 !important;
-    background: rgba(255, 255, 255, 0.9) !important;
-    border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
-    backdrop-filter: blur(22px) saturate(180%) !important;
-    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.05) !important;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    overflow-x: hidden !important;
-}
-
-/* 2. 收起状态：保留 72px 宽度，展示极简图标导航 */
-section[data-testid="stSidebar"][aria-expanded="false"] {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    bottom: 0 !important;
-    width: 72px !important;
-    min-width: 72px !important;
-    max-width: 72px !important;
-    transform: none !important;
-    margin-left: 0 !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 100 !important;
+    z-index: 9999 !important;
     background: rgba(255, 255, 255, 0.92) !important;
     border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
     backdrop-filter: blur(22px) saturate(180%) !important;
-    box-shadow: 4px 0 20px rgba(15, 23, 42, 0.05) !important;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.05) !important;
     overflow-x: hidden !important;
-}
-
-/* 收起状态下的标题隐藏 */
-section[data-testid="stSidebar"][aria-expanded="false"] .sidebar-title {
-    display: none !important;
-}
-
-/* 收起状态下内边距与菜单项居中变成正方形小胶囊 */
-section[data-testid="stSidebar"][aria-expanded="false"] [data-testid="stSidebarUserContent"] {
-    padding: 64px 8px 16px 8px !important;
-}
-section[data-testid="stSidebar"][aria-expanded="false"] div[data-testid="stRadio"] label {
-    width: 48px !important;
-    height: 48px !important;
-    padding: 0 !important;
-    margin: 0 auto 10px auto !important;
-    border-radius: 12px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    overflow: hidden !important;
-}
-section[data-testid="stSidebar"][aria-expanded="false"] div[data-testid="stRadio"] label p {
-    font-size: 20px !important;
-    line-height: 1 !important;
-    overflow: hidden !important;
-    width: 26px !important;
-    white-space: nowrap !important;
-    text-overflow: clip !important;
-}
+}}
 
 /* 主内容区域跟随侧边栏平滑避让 */
-.stApp:has(section[data-testid="stSidebar"][aria-expanded="false"]) .main,
-.stApp:has(section[data-testid="stSidebar"][aria-expanded="false"]) [data-testid="stMain"] {
-    margin-left: 72px !important;
-    width: calc(100% - 72px) !important;
-    max-width: calc(100% - 72px) !important;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-.stApp:has(section[data-testid="stSidebar"][aria-expanded="true"]) .main,
-.stApp:has(section[data-testid="stSidebar"][aria-expanded="true"]) [data-testid="stMain"] {
-    margin-left: 250px !important;
-    width: calc(100% - 250px) !important;
-    max-width: calc(100% - 250px) !important;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
+[data-testid="stMain"], .main {{
+    margin-left: {sidebar_width}px !important;
+    width: calc(100% - {sidebar_width}px) !important;
+    max-width: calc(100% - {sidebar_width}px) !important;
+}}
 
-/* 收起时常驻在 72px 顶部的展开按钮（>） */
-[data-testid="stSidebarCollapsedControl"] {
+/* 侧边栏内边距调整 */
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{
+    padding: {"18px 8px" if st.session_state.sidebar_collapsed else "24px 14px"} !important;
+}}
+
+/* 隐藏自带的 Radio label */
+section[data-testid="stSidebar"] div[data-testid="stRadio"] > label {{
+    display: none !important;
+}}
+
+/* 单选菜单胶囊基础样式 */
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label {{
+    border-radius: 12px !important;
+    background: transparent !important;
+    color: #475569 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    margin: 0 auto 8px auto !important;
+    border: none !important;
     display: flex !important;
-    visibility: visible !important;
-    position: fixed !important;
-    top: 14px !important;
-    left: 14px !important;
-    z-index: 1000 !important;
-}
-[data-testid="stSidebarCollapsedControl"] button {
-    width: 44px !important;
-    height: 38px !important;
-    border-radius: 10px !important;
-    background: #EEF2FF !important;
-    border: 1px solid #C7D2FE !important;
-    color: #4338CA !important;
-}
+    align-items: center !important;
+    justify-content: {"center" if st.session_state.sidebar_collapsed else "flex-start"} !important;
+    width: {"50px" if st.session_state.sidebar_collapsed else "100%"} !important;
+    height: {"50px" if st.session_state.sidebar_collapsed else "auto"} !important;
+    padding: {"0" if st.session_state.sidebar_collapsed else "12px 16px"} !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child {{
+    display: none !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {{
+    background: #F1F5F9 !important;
+    color: #1E1B4B !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"],
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) {{
+    color: #ffffff !important;
+    background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
+    box-shadow: 0 6px 16px rgba(67, 56, 202, 0.28) !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"] p,
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) p {{
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {{
+    font-size: {"22px" if st.session_state.sidebar_collapsed else "15px"} !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+}}
 
-/* 侧边栏内部展开时的收起小箭头（◀） */
-[data-testid="stSidebarCollapseButton"] button {
-    background: #EEF2FF !important;
-    border: 1px solid #C7D2FE !important;
-    border-radius: 8px !important;
-    color: #4338CA !important;
-}
-
-/* 侧边栏标题与菜单项通用样式 */
-[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarUserContent"] {
-    padding: 24px 14px !important;
-}
-.sidebar-title {
-    font-size: 20px;
+/* 侧边栏标题 */
+.sidebar-title {{
+    font-size: 19px;
     font-weight: 700;
     letter-spacing: 0.5px;
-    margin-bottom: 22px;
-    padding: 0 8px;
     background: linear-gradient(120deg,#4338CA,#0284C7 50%,#7C3AED);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     display: block;
     white-space: nowrap;
-}
-[data-testid="stSidebar"] div[data-testid="stRadio"] > div {
-    gap: 8px !important;
-}
-[data-testid="stSidebar"] div[data-testid="stRadio"] label {
-    padding: 12px 16px !important;
-    border-radius: 14px !important;
-    background: transparent !important;
-    color: #475569 !important;
-    font-size: 15px !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    margin: 0 !important;
-    border: none !important;
-    width: 100% !important;
-    display: flex !important;
-    align-items: center !important;
-}
-[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child {
-    display: none !important;
-}
-[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {
-    background: #F1F5F9 !important;
-    color: #1E1B4B !important;
-}
-[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"],
-[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) {
-    color: #ffffff !important;
-    background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
-    box-shadow: 0 8px 18px rgba(67, 56, 202, 0.28) !important;
-}
-[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"] p,
-[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) p {
-    color: #ffffff !important;
-    font-weight: 600 !important;
-}
+    line-height: 38px;
+}}
 
-/* 页面顶部标题与轻量统计信息 */
-.report-header {
+/* 自定义展开/收起按钮样式 */
+button[key="btn_toggle_sidebar"] {{
+    border-radius: 8px !important;
+    background: #EEF2FF !important;
+    border: 1px solid #C7D2FE !important;
+    color: #4338CA !important;
+    font-weight: 700 !important;
+    padding: 0 !important;
+    height: 38px !important;
+    transition: all 0.2s ease !important;
+}}
+button[key="btn_toggle_sidebar"]:hover {{
+    background: #E0E7FF !important;
+    border-color: #818CF8 !important;
+    color: #3730A3 !important;
+}}
+
+/* 页面顶部标题与操作栏 */
+.block-container {{
+    padding-top: 1.8rem !important;
+}}
+.report-header {{
     font-size: 26px;
     font-weight: 700;
     background: linear-gradient(120deg,#4338CA,#0284C7 50%,#7C3AED);
@@ -244,8 +207,8 @@ section[data-testid="stSidebar"][aria-expanded="false"] div[data-testid="stRadio
     background-clip: text;
     color: transparent;
     display: inline-block;
-}
-.tab-summary-badge {
+}}
+.tab-summary-badge {{
     font-size: 14px;
     font-weight: 400;
     color: #64748B;
@@ -253,31 +216,30 @@ section[data-testid="stSidebar"][aria-expanded="false"] div[data-testid="stRadio
     display: inline-flex;
     align-items: center;
     gap: 6px;
-}
-.tab-summary-badge strong {
+}}
+.tab-summary-badge strong {{
     font-weight: 600;
     color: #1E293B;
-}
+}}
 
-/* 顶部刷新按钮样式微调 */
-button[key="top_refresh_btn"] {
-    border-radius: 12px !important;
+/* 顶部刷新按钮 */
+button[key="top_sync_btn"] {{
+    border-radius: 10px !important;
     font-size: 14px !important;
     font-weight: 600 !important;
     background: #ffffff !important;
     color: #4338CA !important;
     border: 1px solid #C7D2FE !important;
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
-    transition: all 0.2s ease !important;
-}
-button[key="top_refresh_btn"]:hover {
+    height: 42px !important;
+}}
+button[key="top_sync_btn"]:hover {{
     background: #EEF2FF !important;
-    border-color: #818CF8 !important;
     color: #3730A3 !important;
-}
+}}
 
 /* 🎯 重点汇报行：温和蓝紫聚焦 */
-.target-highlight {
+.target-highlight {{
     color: #3730A3 !important;
     font-weight: 500 !important;
     background: #EEF2FF !important;
@@ -288,14 +250,15 @@ button[key="top_refresh_btn"]:hover {
     border-radius: 6px !important;
     display: inline-block !important;
     line-height: 1.65 !important;
-}
-.risk-text .target-highlight {
+}}
+.risk-text .target-highlight {{
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-}
+}}
 
-.section-title {
+/* 卡片排版 */
+.section-title {{
     font-size: 22px;
     font-weight: 700;
     padding-bottom: 8px;
@@ -304,9 +267,9 @@ button[key="top_refresh_btn"]:hover {
     display: flex;
     align-items: center;
     gap: 10px;
-}
-.section-title:first-child { margin-top: 4px; }
-.section-title::after {
+}}
+.section-title:first-child {{ margin-top: 4px; }}
+.section-title::after {{
     content: '';
     position: absolute;
     left: 0;
@@ -315,17 +278,15 @@ button[key="top_refresh_btn"]:hover {
     height: 3px;
     border-radius: 3px;
     background: linear-gradient(90deg,#4F46E5,#0284C7);
-}
-.grad-text {
+}}
+.grad-text {{
     background: linear-gradient(120deg,#4338CA,#0284C7 50%,#7C3AED);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-}
-
-/* 卡片排版 */
-.card-stack { display: flex; flex-direction: column; gap: 20px; }
-.card {
+}}
+.card-stack {{ display: flex; flex-direction: column; gap: 20px; }}
+.card {{
     position: relative;
     padding: 22px 26px;
     border-radius: 18px;
@@ -333,12 +294,12 @@ button[key="top_refresh_btn"]:hover {
     border: 1px solid rgba(255,255,255,.95);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
-    box-shadow: 0 8px 26px rgba(15,23,42,.05);
+    box-shadow: 0 8px 26px rgba(15, 23, 42, .05);
     transition: transform .2s ease, box-shadow .2s ease;
-}
-.card:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(15,23,42,.08); }
+}}
+.card:hover {{ transform: translateY(-2px); box-shadow: 0 14px 34px rgba(15, 23, 42, .08); }}
 
-.card-title {
+.card-title {{
     font-size: 20px;
     font-weight: 700;
     color: #0F172A;
@@ -349,18 +310,18 @@ button[key="top_refresh_btn"]:hover {
     gap: 12px;
     padding-bottom: 10px;
     border-bottom: 1px solid #E2E8F0;
-}
-.product-title {
+}}
+.product-title {{
     font-size: 21px;
     font-weight: 700;
     background: linear-gradient(120deg,#4338CA,#0284C7);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-}
-.block-title { margin: 0 0 16px; font-size: 20px; font-weight: 700; color: #0F172A; }
+}}
+.block-title {{ margin: 0 0 16px; font-size: 20px; font-weight: 700; color: #0F172A; }}
 
-.tag {
+.tag {{
     display: inline-block;
     padding: 2px 10px;
     font-size: 13px;
@@ -369,15 +330,15 @@ button[key="top_refresh_btn"]:hover {
     color: #3730A3;
     background: #EEF2FF;
     border: 1px solid #C7D2FE;
-}
-.tag-success { color: #065F46; background: #ECFDF5; border-color: #A7F3D0; }
-.tag-muted { color: #475569; background: #F1F5F9; border-color: #CBD5E1; }
+}}
+.tag-success {{ color: #065F46; background: #ECFDF5; border-color: #A7F3D0; }}
+.tag-muted {{ color: #475569; background: #F1F5F9; border-color: #CBD5E1; }}
 
-.progress-wrapper { margin: 14px 0 10px; }
-.progress-header { display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; color: #64748B; margin-bottom: 6px; }
-.progress-header span:last-child { font-weight: 600; color: #1E293B; }
-.progress-bg { width: 100%; height: 10px; border-radius: 99px; background: #E2E8F0; box-shadow: inset 0 2px 4px rgba(15,23,42,.08); overflow: hidden; }
-.progress-fill {
+.progress-wrapper {{ margin: 14px 0 10px; }}
+.progress-header {{ display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; color: #64748B; margin-bottom: 6px; }}
+.progress-header span:last-child {{ font-weight: 600; color: #1E293B; }}
+.progress-bg {{ width: 100%; height: 10px; border-radius: 99px; background: #E2E8F0; box-shadow: inset 0 2px 4px rgba(15, 23, 42, .08); overflow: hidden; }}
+.progress-fill {{
     height: 100%;
     border-radius: 99px;
     position: relative;
@@ -385,39 +346,39 @@ button[key="top_refresh_btn"]:hover {
     background: linear-gradient(90deg,#4F46E5,#2563EB,#0284C7,#7C3AED,#4F46E5);
     background-size: 300% 100%;
     animation: flow 4s linear infinite;
-}
-@keyframes flow { to { background-position: 300% 0; } }
+}}
+@keyframes flow {{ to {{ background-position: 300% 0; }} }}
 
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
-@media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+.grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }}
+@media (max-width: 900px) {{ .grid-2 {{ grid-template-columns: 1fr; }} }}
 
-.field-row {
+.field-row {{
     margin-bottom: 12px;
     font-size: 14.5px;
     line-height: 1.7;
     color: #334155;
     font-weight: 400;
-}
-.label {
+}}
+.label {{
     color: #4338CA;
     font-weight: 600;
     display: inline-block;
     margin-right: 6px;
     font-size: 14.5px;
-}
-.value {
+}}
+.value {{
     color: #334155;
     font-weight: 400;
     font-size: 14.5px;
-}
+}}
 
-.highlight-block { padding: 14px 16px; border-radius: 14px; background: rgba(248,250,252,.92); border: 1px solid #E2E8F0; border-left: 4px solid #6366F1; }
-.highlight-attention { border-color: #BFDBFE; border-left: 4px solid #2563EB; background: #F8FAFC; }
-.highlight-attention .label { color: #1D4ED8; }
-.highlight-plan { border-color: #BBF7D0; border-left: 4px solid #059669; background: #F8FCF9; }
-.highlight-plan .label { color: #047857; }
+.highlight-block {{ padding: 14px 16px; border-radius: 14px; background: rgba(248,250,252,.92); border: 1px solid #E2E8F0; border-left: 4px solid #6366F1; }}
+.highlight-attention {{ border-color: #BFDBFE; border-left: 4px solid #2563EB; background: #F8FAFC; }}
+.highlight-attention .label {{ color: #1D4ED8; }}
+.highlight-plan {{ border-color: #BBF7D0; border-left: 4px solid #059669; background: #F8FCF9; }}
+.highlight-plan .label {{ color: #047857; }}
 
-.risk-text {
+.risk-text {{
     display: block;
     margin-top: 6px;
     padding: 8px 12px;
@@ -428,23 +389,23 @@ button[key="top_refresh_btn"]:hover {
     line-height: 1.6;
     background: #FEE2E2;
     border: 1px solid #FCA5A5;
-}
+}}
 
-.img-container img {
+.img-container img {{
     width: 100%;
     max-height: 460px;
     object-fit: contain;
     border-radius: 14px;
     margin-top: 14px;
     border: 1px solid #E2E8F0;
-    box-shadow: 0 6px 20px rgba(15,23,42,.06);
+    box-shadow: 0 6px 20px rgba(15, 23, 42, .06);
     background: #fff;
-}
-.spec-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 14px; border-radius: 12px; overflow: hidden; border: 1px solid #E2E8F0; background: #fff; box-shadow: 0 4px 16px rgba(15,23,42,.03); }
-.spec-table th, .spec-table td { padding: 11px 16px; font-size: 14px; line-height: 1.6; border-bottom: 1px solid #E2E8F0; font-weight: 400; color: #334155; }
-.spec-table th { font-weight: 600; color: #1E1B4B; background: #EEF2FF; }
-.ct0 { border-bottom: 0 !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }
-.mt12 { margin-top: 10px; }
+}}
+.spec-table {{ width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 14px; border-radius: 12px; overflow: hidden; border: 1px solid #E2E8F0; background: #fff; box-shadow: 0 4px 16px rgba(15, 23, 42, .03); }}
+.spec-table th, .spec-table td {{ padding: 11px 16px; font-size: 14px; line-height: 1.6; border-bottom: 1px solid #E2E8F0; font-weight: 400; color: #334155; }}
+.spec-table th {{ font-weight: 600; color: #1E1B4B; background: #EEF2FF; }}
+.ct0 {{ border-bottom: 0 !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }}
+.mt12 {{ margin-top: 10px; }}
 </style>
 """)
 
@@ -701,26 +662,59 @@ def parse_complaint_data(df):
             
     return chart_list, plans
 
-# ----------------- 6. 侧边栏导航 -----------------
+# ----------------- 6. 侧边栏：状态化 250px 展开 / 72px 极简图标坞 -----------------
 with st.sidebar:
-    render_html('<span class="sidebar-title">GTS 周会汇报</span>')
-    selected_tab = st.radio(
-        "导航选择",
-        options=["📦 交付中项目", "🔧 运维中项目", "🏁 已完结/挂起项目", "📑 其他事项汇总"],
-        label_visibility="collapsed"
-    )
+    if not st.session_state.sidebar_collapsed:
+        # 展开状态：完整标题 + ◀ 收起按钮
+        col_t, col_b = st.columns([3.8, 1.2])
+        with col_t:
+            st.markdown('<span class="sidebar-title">GTS 周会汇报</span>', unsafe_allow_html=True)
+        with col_b:
+            if st.button("◀", key="btn_toggle_sidebar", help="收起导航为图标模式", use_container_width=True):
+                st.session_state.sidebar_collapsed = True
+                st.rerun()
+        
+        st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+        # 展开状态下展示完整名称
+        full_labels = [t["label"] for t in NAV_TABS]
+        sel_label = st.radio(
+            "导航选择",
+            options=full_labels,
+            index=st.session_state.active_tab_idx,
+            label_visibility="collapsed"
+        )
+        st.session_state.active_tab_idx = full_labels.index(sel_label)
+    else:
+        # 收起状态（72px）：常驻居中 ▶ 展开按钮 + 居中单图标
+        if st.button("▶", key="btn_toggle_sidebar", help="展开完整导航", use_container_width=True):
+            st.session_state.sidebar_collapsed = False
+            st.rerun()
+            
+        st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+        # 收起状态下只展示图标（纯净居中，绝不截断）
+        icon_labels = [t["icon"] for t in NAV_TABS]
+        sel_icon = st.radio(
+            "导航图标",
+            options=icon_labels,
+            index=st.session_state.active_tab_idx,
+            label_visibility="collapsed"
+        )
+        st.session_state.active_tab_idx = icon_labels.index(sel_icon)
 
-# ----------------- 7. 顶部操作栏（刷新按钮移到标题右侧，避开右下角） -----------------
+# 获取当前激活的 Tab ID
+current_tab_id = NAV_TABS[st.session_state.active_tab_idx]["id"]
+
+# ----------------- 7. 顶部大屏标题栏与刷新按钮 -----------------
 col_title, col_btn = st.columns([5, 1])
 with col_title:
     render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
 with col_btn:
-    if st.button("🔄 刷新最新数据", key="top_refresh_btn", use_container_width=True):
+    if st.button("🔄 刷新最新数据", key="top_sync_btn", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
 # ==================== Tab 1：交付中项目 ====================
-if selected_tab == "📦 交付中项目":
+if current_tab_id == "delivery":
     df_del = DATA_HUB["delivery"]
     if df_del.empty:
         st.info("暂未获取到交付中项目数据。")
@@ -801,7 +795,7 @@ if selected_tab == "📦 交付中项目":
         """)
 
 # ==================== Tab 2：运维中项目 ====================
-elif selected_tab == "🔧 运维中项目":
+elif current_tab_id == "maint":
     df_maint = DATA_HUB["maint"]
     if df_maint.empty:
         st.info("暂无运维中项目。")
@@ -839,7 +833,7 @@ elif selected_tab == "🔧 运维中项目":
         render_html("\n".join(maint_cards))
 
 # ==================== Tab 3：已完结/挂起项目 ====================
-elif selected_tab == "🏁 已完结/挂起项目":
+elif current_tab_id == "finish":
     df_fin = DATA_HUB["finish"]
     if df_fin.empty:
         st.info("暂无已完结或挂起项目。")
@@ -868,7 +862,7 @@ elif selected_tab == "🏁 已完结/挂起项目":
         render_html("\n".join(fin_cards))
 
 # ==================== Tab 4：其他事项汇总 ====================
-elif selected_tab == "📑 其他事项汇总":
+elif current_tab_id == "other":
     df_dev_all = DATA_HUB["dev_all"]
     df_non_del = DATA_HUB["non_del"]
     df_complaint = DATA_HUB["complaint"]
