@@ -79,7 +79,7 @@ GTS_LOGO_SVG = """
 </span>
 """
 
-# 3. 注入全局样式与双层徽章屏蔽机制
+# 3. 注入全局样式与整洁避让的悬浮按钮 CSS
 render_html(f"""
 <style>
 /* 全局微光渐变背景 */
@@ -107,35 +107,14 @@ header[data-testid="stHeader"] {{
     display: none !important;
 }}
 
-/* ================= 核心防御 1：深度通配符屏蔽右下角所有系统级徽章与探针 ================= */
-a[href*="streamlit.io" i],
-a[href*="status" i],
-a[href*="statuspage" i],
-div:has(> a[href*="streamlit.io" i]),
-div:has(> a[href*="status" i]),
-div:has(> a[href*="statuspage" i]),
-*[class*="viewerbadge" i],
-*[class*="statuswidget" i],
-*[class*="status-widget" i],
-*[class*="stStatusWidget" i],
-*[class*="floatingStatus" i],
+/* 隐藏应用内多余元素 */
 [data-testid="manage-app-button"],
-[data-testid="stStatusWidget"],
-[data-testid="stConnectionStatus"],
-iframe[title="Frame"],
 footer {{
     display: none !important;
     visibility: hidden !important;
-    opacity: 0 !important;
-    width: 0 !important;
-    height: 0 !important;
-    pointer-events: none !important;
-    position: absolute !important;
-    left: -9999px !important;
-    bottom: -9999px !important;
 }}
 
-/* ================= 侧边栏结构：锁定 {sb_width}px ================= */
+/* ================= 侧边栏结构：精准锁定 {sb_width}px ================= */
 section[data-testid="stSidebar"] {{
     position: fixed !important;
     top: 0 !important;
@@ -231,9 +210,6 @@ div[class*="st-key-toggle_sidebar_btn"] button p {{
     margin: 0 !important;
     padding: 0 !important;
     text-align: center !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
 }}
 
 /* 展开状态导航胶囊 */
@@ -355,10 +331,10 @@ div[class*="st-key-nav_col_"] button[kind="primary"] p {{
     color: #1E293B;
 }}
 
-/* 右下角悬浮刷新胶囊（FAB） */
+/* ================= 核心：右下角常驻悬浮刷新胶囊（优雅上浮避让，保持呼吸留白） ================= */
 div.st-key-floating_refresh_btn button {{
     position: fixed !important;
-    bottom: 35px !important;
+    bottom: 56px !important;
     right: 28px !important;
     z-index: 999999 !important;
     border-radius: 999px !important;
@@ -558,35 +534,6 @@ div.st-key-floating_refresh_btn button p {{
 .ct0 {{ border-bottom: 0 !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }}
 .mt12 {{ margin-top: 10px; }}
 </style>
-""")
-
-# ================= 核心防御 2：主 DOM 探针守护脚本（强力查杀底部徽章） =================
-render_html("""
-<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:none;" onerror="
-(function(){
-    function wipeStreamlitBadges() {
-        try {
-            var badges = document.querySelectorAll('a[href*=\\'streamlit.io\\' i], a[href*=\\'status\\' i], *[class*=\\'viewerbadge\\' i], *[class*=\\'statuswidget\\' i]');
-            badges.forEach(function(el) {
-                var p = el;
-                while (p && p !== document.body && !p.classList.contains('stApp')) {
-                    var s = window.getComputedStyle(p);
-                    if (s.position === 'fixed' || s.position === 'absolute') {
-                        p.style.setProperty('display', 'none', 'important');
-                        p.style.setProperty('visibility', 'hidden', 'important');
-                        p.style.setProperty('opacity', '0', 'important');
-                        break;
-                    }
-                    p = p.parentElement;
-                }
-                el.style.setProperty('display', 'none', 'important');
-            });
-        } catch(e) {}
-    }
-    wipeStreamlitBadges();
-    setInterval(wipeStreamlitBadges, 400);
-})();
-" />
 """)
 
 # 4. 原生零报错防 nan 函数
@@ -861,7 +808,7 @@ with st.sidebar:
                 st.session_state.active_tab_idx = i
                 st.rerun()
     else:
-        # B. 收起模式：居中对齐展开按钮 » + 纯粹单图标（100% 居中，零截断）
+        # B. 收起模式：居中对齐展开按钮 » + 纯单图标（100% 居中，零截断）
         if st.button("»", key="toggle_sidebar_btn", help="展开完整导航"):
             st.session_state.sidebar_collapsed = False
             st.rerun()
@@ -884,7 +831,7 @@ render_html(f'''
 </div>
 ''')
 
-# ----------------- 8. 右下角常驻悬浮刷新胶囊（FAB） -----------------
+# ----------------- 8. 右下角专属悬浮刷新胶囊（FAB：上浮避让，保持呼吸间距） -----------------
 if st.button("🔄 刷新数据", key="floating_refresh_btn"):
     st.cache_data.clear()
     st.rerun()
