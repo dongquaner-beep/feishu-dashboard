@@ -41,7 +41,7 @@ NAV_TABS = [
     {"id": "other", "label": "📑 其他事项汇总", "icon": "📑"},
 ]
 
-# 初始化侧边栏状态与选中项
+# 初始化侧边栏状态与激活项
 if "sidebar_collapsed" not in st.session_state:
     st.session_state.sidebar_collapsed = False
 if "active_tab_idx" not in st.session_state:
@@ -52,12 +52,13 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 动态注入布局 CSS（根据展开/收起状态精准匹配 250px 或 72px）
-sidebar_width = 72 if st.session_state.sidebar_collapsed else 250
+# 动态计算侧边栏宽度：展开为 250px，收起为 68px 纯图标坞
+sb_width = 68 if st.session_state.sidebar_collapsed else 250
 
+# 3. 注入全局样式与精致 Mini-Rail 侧边栏 CSS
 render_html(f"""
 <style>
-/* 全局背景 */
+/* 全局微光渐变背景 */
 .stApp {{
     background: radial-gradient(60% 52% at 12% 8%,rgba(99,102,241,.14),transparent 70%),
                 radial-gradient(55% 46% at 90% 6%,rgba(56,189,248,.13),transparent 70%),
@@ -68,7 +69,7 @@ render_html(f"""
     color: #334155;
 }}
 
-/* 顶栏设为透明，屏蔽右上角无用杂项菜单 */
+/* 顶栏背景透明，隐藏系统杂项 */
 header[data-testid="stHeader"] {{
     background: transparent !important;
     pointer-events: none !important;
@@ -76,23 +77,21 @@ header[data-testid="stHeader"] {{
 [data-testid="stToolbar"], [data-testid="stDecoration"] {{
     display: none !important;
 }}
-
-/* 隐藏 Streamlit 原生展开收起按钮，改用我们自定义的稳定按钮 */
 [data-testid="stSidebarCollapseButton"],
 [data-testid="stSidebarCollapsedControl"],
 [data-testid="collapsedControl"] {{
     display: none !important;
 }}
 
-/* ================= 侧边栏绝对锁定：宽度 {sidebar_width}px，无视原生推挤 ================= */
+/* ================= 侧边栏结构：精准锁定 {sb_width}px ================= */
 section[data-testid="stSidebar"] {{
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     bottom: 0 !important;
-    width: {sidebar_width}px !important;
-    min-width: {sidebar_width}px !important;
-    max-width: {sidebar_width}px !important;
+    width: {sb_width}px !important;
+    min-width: {sb_width}px !important;
+    max-width: {sb_width}px !important;
     transform: none !important;
     margin-left: 0 !important;
     display: block !important;
@@ -108,39 +107,93 @@ section[data-testid="stSidebar"] {{
 
 /* 主内容区域跟随侧边栏平滑避让 */
 [data-testid="stMain"], .main {{
-    margin-left: {sidebar_width}px !important;
-    width: calc(100% - {sidebar_width}px) !important;
-    max-width: calc(100% - {sidebar_width}px) !important;
+    margin-left: {sb_width}px !important;
+    width: calc(100% - {sb_width}px) !important;
+    max-width: calc(100% - {sb_width}px) !important;
 }}
 
-/* 侧边栏内边距调整 */
+/* 侧边栏内边距 */
 section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{
-    padding: {"18px 8px" if st.session_state.sidebar_collapsed else "24px 14px"} !important;
+    padding: {"16px 8px" if st.session_state.sidebar_collapsed else "22px 14px"} !important;
 }}
 
-/* 隐藏自带的 Radio label */
-section[data-testid="stSidebar"] div[data-testid="stRadio"] > label {{
+/* 隐藏自带的单选框标题与原生圆圈 (○) */
+div[data-testid="stWidgetLabel"],
+section[data-testid="stSidebar"] div[data-testid="stRadio"] > label,
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child,
+section[data-testid="stSidebar"] div[data-testid="stRadio"] input[type="radio"] {{
     display: none !important;
 }}
 
-/* 单选菜单胶囊基础样式 */
+/* ================= 核心：收起后的 68px 纯图标坞设计 ================= */
+{"'''" if not st.session_state.sidebar_collapsed else ""}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] {{
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 12px !important;
+}}
 section[data-testid="stSidebar"] div[data-testid="stRadio"] label {{
-    border-radius: 12px !important;
-    background: transparent !important;
-    color: #475569 !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    margin: 0 auto 8px auto !important;
-    border: none !important;
+    width: 46px !important;
+    height: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 13px !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: {"center" if st.session_state.sidebar_collapsed else "flex-start"} !important;
-    width: {"50px" if st.session_state.sidebar_collapsed else "100%"} !important;
-    height: {"50px" if st.session_state.sidebar_collapsed else "auto"} !important;
-    padding: {"0" if st.session_state.sidebar_collapsed else "12px 16px"} !important;
+    justify-content: center !important;
+    background: transparent !important;
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    border: 1px solid transparent !important;
+    cursor: pointer !important;
 }}
-section[data-testid="stSidebar"] div[data-testid="stRadio"] label > div:first-child {{
-    display: none !important;
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {{
+    background: #EEF2FF !important;
+    border-color: #C7D2FE !important;
+    transform: translateY(-1px) !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"],
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) {{
+    background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
+    border-color: transparent !important;
+    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.38) !important;
+    transform: scale(1.06) !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {{
+    font-size: 21px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #334155 !important;
+}}
+{"'''" if not st.session_state.sidebar_collapsed else ""}
+
+/* ================= 展开后的 250px 完整胶囊菜单 ================= */
+{"'''" if st.session_state.sidebar_collapsed else ""}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] {{
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] label {{
+    width: 100% !important;
+    padding: 11px 16px !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    background: transparent !important;
+    color: #475569 !important;
+    font-size: 14.5px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    border: 1px solid transparent !important;
+    margin: 0 !important;
+    cursor: pointer !important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {{
     background: #F1F5F9 !important;
@@ -155,18 +208,18 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:chec
 section[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-checked="true"] p,
 section[data-testid="stSidebar"] div[data-testid="stRadio"] label:has(input:checked) p {{
     color: #ffffff !important;
-    font-weight: 700 !important;
+    font-weight: 600 !important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {{
-    font-size: {"22px" if st.session_state.sidebar_collapsed else "15px"} !important;
+    font-size: 14.5px !important;
     margin: 0 !important;
-    line-height: 1 !important;
-    white-space: nowrap !important;
+    line-height: 1.4 !important;
 }}
+{"'''" if st.session_state.sidebar_collapsed else ""}
 
 /* 侧边栏标题 */
 .sidebar-title {{
-    font-size: 19px;
+    font-size: 18px;
     font-weight: 700;
     letter-spacing: 0.5px;
     background: linear-gradient(120deg,#4338CA,#0284C7 50%,#7C3AED);
@@ -175,33 +228,43 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {{
     color: transparent;
     display: block;
     white-space: nowrap;
-    line-height: 38px;
+    line-height: 34px;
 }}
 
-/* 自定义展开/收起按钮样式 */
+/* ================= 展开/收起按钮美化 ================= */
 button[key="btn_toggle_sidebar"] {{
-    border-radius: 8px !important;
+    border-radius: 9px !important;
     background: #EEF2FF !important;
     border: 1px solid #C7D2FE !important;
     color: #4338CA !important;
-    font-weight: 700 !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    width: {"42px" if st.session_state.sidebar_collapsed else "32px"} !important;
+    height: {"34px" if st.session_state.sidebar_collapsed else "32px"} !important;
     padding: 0 !important;
-    height: 38px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+    box-shadow: 0 2px 6px rgba(79, 70, 229, 0.08) !important;
     transition: all 0.2s ease !important;
 }}
 button[key="btn_toggle_sidebar"]:hover {{
-    background: #E0E7FF !important;
-    border-color: #818CF8 !important;
-    color: #3730A3 !important;
+    background: #4F46E5 !important;
+    color: #ffffff !important;
+    border-color: #4F46E5 !important;
+    transform: scale(1.06) !important;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.28) !important;
 }}
 
-/* 页面顶部标题与操作栏 */
+/* 页面顶部标题与排版 */
 .block-container {{
-    padding-top: 1.8rem !important;
+    padding-top: 2rem !important;
 }}
 .report-header {{
     font-size: 26px;
     font-weight: 700;
+    margin-bottom: 6px;
     background: linear-gradient(120deg,#4338CA,#0284C7 50%,#7C3AED);
     -webkit-background-clip: text;
     background-clip: text;
@@ -222,20 +285,42 @@ button[key="btn_toggle_sidebar"]:hover {{
     color: #1E293B;
 }}
 
-/* 顶部刷新按钮 */
-button[key="top_sync_btn"] {{
-    border-radius: 10px !important;
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    background: #ffffff !important;
-    color: #4338CA !important;
-    border: 1px solid #C7D2FE !important;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
-    height: 42px !important;
+/* 隐藏外层多余 Manage app 悬浮框 */
+[data-testid="manage-app-button"],
+[data-testid="stStatusWidget"],
+div[class*="viewerBadge"],
+div[class*="StatusWidget"],
+iframe[title="Frame"],
+footer {{
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }}
-button[key="top_sync_btn"]:hover {{
-    background: #EEF2FF !important;
-    color: #3730A3 !important;
+
+/* ================= 核心：右下角流光悬浮刷新胶囊（FAB） ================= */
+button[key="fab_sync_btn"] {{
+    position: fixed !important;
+    bottom: 35px !important;
+    right: 28px !important;
+    z-index: 99999 !important;
+    border-radius: 99px !important;
+    padding: 8px 18px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.38) !important;
+    backdrop-filter: blur(10px) !important;
+    cursor: pointer !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    width: auto !important;
+}}
+button[key="fab_sync_btn"]:hover {{
+    transform: translateY(-2px) scale(1.03) !important;
+    box-shadow: 0 12px 28px rgba(79, 70, 229, 0.48) !important;
+    background: linear-gradient(135deg, #4338CA, #1D4ED8) !important;
 }}
 
 /* 🎯 重点汇报行：温和蓝紫聚焦 */
@@ -662,39 +747,37 @@ def parse_complaint_data(df):
             
     return chart_list, plans
 
-# ----------------- 6. 侧边栏：状态化 250px 展开 / 72px 极简图标坞 -----------------
+# ----------------- 6. 侧边栏：状态化 250px 展开 / 68px 纯图标坞 -----------------
 with st.sidebar:
     if not st.session_state.sidebar_collapsed:
-        # 展开状态：完整标题 + ◀ 收起按钮
-        col_t, col_b = st.columns([3.8, 1.2])
+        # A. 展开模式：完整标题 + 优雅的收起小按钮 ❮
+        col_t, col_b = st.columns([4, 1.2])
         with col_t:
-            st.markdown('<span class="sidebar-title">GTS 周会汇报</span>', unsafe_allow_html=True)
+            render_html('<span class="sidebar-title">GTS 周会汇报</span>')
         with col_b:
-            if st.button("◀", key="btn_toggle_sidebar", help="收起导航为图标模式", use_container_width=True):
+            if st.button("❮", key="btn_toggle_sidebar", help="收起导航为图标模式"):
                 st.session_state.sidebar_collapsed = True
                 st.rerun()
         
-        st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
-        # 展开状态下展示完整名称
+        render_html("<div style='height:10px;'></div>")
         full_labels = [t["label"] for t in NAV_TABS]
         sel_label = st.radio(
-            "导航选择",
+            "nav_expanded",
             options=full_labels,
             index=st.session_state.active_tab_idx,
             label_visibility="collapsed"
         )
         st.session_state.active_tab_idx = full_labels.index(sel_label)
     else:
-        # 收起状态（72px）：常驻居中 ▶ 展开按钮 + 居中单图标
-        if st.button("▶", key="btn_toggle_sidebar", help="展开完整导航", use_container_width=True):
+        # B. 收起模式：居中展开按钮 ❯ + 纯粹图标胶囊（100% 居中，零截断）
+        if st.button("❯", key="btn_toggle_sidebar", help="展开完整导航"):
             st.session_state.sidebar_collapsed = False
             st.rerun()
             
-        st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
-        # 收起状态下只展示图标（纯净居中，绝不截断）
+        render_html("<div style='height:14px;'></div>")
         icon_labels = [t["icon"] for t in NAV_TABS]
         sel_icon = st.radio(
-            "导航图标",
+            "nav_collapsed",
             options=icon_labels,
             index=st.session_state.active_tab_idx,
             label_visibility="collapsed"
@@ -704,14 +787,13 @@ with st.sidebar:
 # 获取当前激活的 Tab ID
 current_tab_id = NAV_TABS[st.session_state.active_tab_idx]["id"]
 
-# ----------------- 7. 顶部大屏标题栏与刷新按钮 -----------------
-col_title, col_btn = st.columns([5, 1])
-with col_title:
-    render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
-with col_btn:
-    if st.button("🔄 刷新最新数据", key="top_sync_btn", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
+# ----------------- 7. 页面主标题栏 & 右下角悬浮刷新胶囊 -----------------
+render_html('<div class="report-header">📊 GTS 部门周会汇报大屏</div>')
+
+# 恢复右下角悬浮刷新胶囊按钮
+if st.button("🔄 刷新数据", type="primary", key="fab_sync_btn"):
+    st.cache_data.clear()
+    st.rerun()
 
 # ==================== Tab 1：交付中项目 ====================
 if current_tab_id == "delivery":
