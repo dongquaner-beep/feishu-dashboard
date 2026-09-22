@@ -5,7 +5,7 @@ import pandas as pd
 import json
 import base64
 
-# 1. 页面基本配置（默认展开左侧导航）
+# 1. 页面基本配置
 st.set_page_config(
     page_title="全球技术服务中心周报",
     layout="wide",
@@ -38,7 +38,7 @@ def render_html(html_str):
     cleaned = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
 
-# 3. 注入全局样式与核心布局修复
+# 3. 注入全局样式（锁定左侧导航栏常驻）
 render_html("""
 <style>
 /* 全局微光渐变背景 */
@@ -52,51 +52,49 @@ render_html("""
     color: #334155;
 }
 
-/* ================= 核心修复：顶栏保持透明，仅隐藏右上角工具菜单，释放左上角展开按钮 ================= */
-header[data-testid="stHeader"] {
-    background: transparent !important;
-    color: #4338CA !important;
-}
-
-/* 仅精准隐藏右上角杂项工具栏（Share、三点菜单、GitHub 等） */
-[data-testid="stToolbar"],
-[data-testid="stDecoration"] {
-    display: none !important;
-    visibility: hidden !important;
-}
-
-/* 核心修复：美化并置顶左上角侧边栏展开图标，确保随时可见且可点击 */
-[data-testid="stSidebarCollapsedControl"],
-[data-testid="collapsedControl"] {
-    display: flex !important;
+/* ================= 核心修复：强制侧边栏常驻显示在屏幕左侧（260px），无视折叠状态 ================= */
+[data-testid="stSidebar"],
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"][aria-expanded="false"] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+    transform: none !important;
+    margin-left: 0 !important;
+    display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    pointer-events: auto !important;
-    position: fixed !important;
-    top: 14px !important;
-    left: 14px !important;
-    z-index: 999999 !important;
-    width: 38px !important;
-    height: 38px !important;
-    border-radius: 10px !important;
-    border: 1px solid #C7D2FE !important;
-    background: rgba(255, 255, 255, 0.95) !important;
-    backdrop-filter: blur(12px) !important;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1) !important;
-    color: #4338CA !important;
-    cursor: pointer !important;
-    align-items: center !important;
-    justify-content: center !important;
-    transition: all 0.2s ease !important;
-}
-[data-testid="stSidebarCollapsedControl"]:hover,
-[data-testid="collapsedControl"]:hover {
-    background: #EEF2FF !important;
-    border-color: #818CF8 !important;
-    transform: scale(1.05) !important;
+    z-index: 100 !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
+    backdrop-filter: blur(22px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.05) !important;
 }
 
-/* 隐藏底栏多余徽章与 Manage app 按钮 */
+/* 核心修复：主内容区域右移 260px，完美避让侧边栏，两者并排排列 */
+[data-testid="stMain"],
+.main {
+    margin-left: 260px !important;
+    width: calc(100% - 260px) !important;
+    max-width: calc(100% - 260px) !important;
+}
+
+/* 隐藏容易误触的收起箭头与原生顶栏 */
+header[data-testid="stHeader"],
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"],
+button[aria-label="Close sidebar"],
+button[aria-label="Collapse sidebar"] {
+    display: none !important;
+}
+
+/* 隐藏右下角底栏多余徽章 */
 .block-container {
     padding-top: 2rem !important;
 }
@@ -112,14 +110,7 @@ footer {
     pointer-events: none !important;
 }
 
-/* 侧边栏整体毛玻璃美化 */
-[data-testid="stSidebar"] {
-    background: rgba(255, 255, 255, 0.88) !important;
-    border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
-    backdrop-filter: blur(22px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
-    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.05) !important;
-}
+/* 侧边栏标题与内边距 */
 [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
     padding: 24px 14px !important;
 }
@@ -202,7 +193,7 @@ footer {
 /* 悬浮刷新胶囊 */
 button[kind="primary"] {
     position: fixed !important;
-    bottom: 45px !important;
+    bottom: 35px !important;
     right: 28px !important;
     z-index: 99999 !important;
     border-radius: 99px !important;
@@ -649,7 +640,7 @@ def parse_complaint_data(df):
             
     return chart_list, plans
 
-# ----------------- 6. 侧边栏导航与双刷新按钮配置 -----------------
+# ----------------- 6. 侧边栏导航（常驻固定展示） -----------------
 with st.sidebar:
     render_html('<span class="sidebar-title">GTS 周会汇报</span>')
     selected_tab = st.radio(
