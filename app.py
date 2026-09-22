@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. 飞书凭据配置（安全读取 Streamlit Secrets 保险箱）
+# 2. 飞书凭据配置（安全读取 Streamlit Secrets 保险箱，兼顾兜底）
 APP_ID = st.secrets.get("APP_ID", "cli_aa2529e038f81be3")
 APP_SECRET = st.secrets.get("APP_SECRET", "gKBRXaqMIYKGGqc9RkyH0b11V4Dk4PSY")
 APP_TOKEN = st.secrets.get("APP_TOKEN", "JqHKw49V3izuZKkm9s8ccGwNnmb")
@@ -249,7 +249,7 @@ div[class*="st-key-nav_exp_"] button[kind="primary"] p {{
     font-size: 14.5px !important;
 }}
 
-/* 收起状态纯单图标方块（100% 居中，零截断） */
+/* 收起状态纯单图标方块 */
 div[class*="st-key-nav_col_"] button {{
     border-radius: 12px !important;
     padding: 0 !important;
@@ -499,7 +499,7 @@ div.st-key-floating_refresh_btn button p {{
     font-size: 14.5px;
 }}
 
-.highlight-block {{ padding: 14px 16px; border-radius: 14px; background: rgba(248,250,252,.92); border: 1px solid #E2E8F0; border-left: 4px solid #6366F1; }}
+.highlight-block {{ padding: 16px 20px; border-radius: 14px; background: rgba(248,250,252,.92); border: 1px solid #E2E8F0; border-left: 4px solid #6366F1; }}
 .highlight-attention {{ border-color: #BFDBFE; border-left: 4px solid #2563EB; background: #F8FAFC; }}
 .highlight-attention .label {{ color: #1D4ED8; }}
 .highlight-plan {{ border-color: #BBF7D0; border-left: 4px solid #059669; background: #F8FCF9; }}
@@ -716,7 +716,7 @@ def load_all_dashboard_data():
         "complaint": df_complaint
     }
 
-# ================= 核心：数据常驻 session_state，普通交互 0 秒切无转圈 =================
+# 数据常驻 session_state，普通交互秒切无转圈
 if "data_hub" not in st.session_state:
     with st.spinner("正在同步飞书全量数据..."):
         st.session_state.data_hub = load_all_dashboard_data()
@@ -923,7 +923,7 @@ if current_tab_id == "delivery":
         </div>
         """)
 
-# ==================== Tab 2：运维中项目 ====================
+# ==================== Tab 2：运维中项目（全新通栏排版，彻底消除左侧空白） ====================
 elif current_tab_id == "maint":
     df_maint = DATA_HUB["maint"]
     if df_maint.empty:
@@ -938,22 +938,29 @@ elif current_tab_id == "maint":
             s_date = safe_val(row.get("运维开始时间"), "-")
             e_date = safe_val(row.get("运维结束时间"), "-")
             cycle = f"{s_date} ~ {e_date}" if s_date != "-" or e_date != "-" else "- ~ -"
-            remark = fmt_txt(row.get("备注说明"))
+            raw_remark = safe_val(row.get("备注说明"), "-")
             progress_matters = fmt_txt(row.get("本周进度及关注事项"))
+            
+            # 备注说明智能收纳：非空且不是 '-' 时以轻量标签跟在周期后方，为空时不占多余版面
+            remark_html = ""
+            if raw_remark != "-":
+                remark_html = f'<div style="font-size:13.5px; color:#64748B;"><span class="label" style="font-size:13.5px;">备注说明:</span> <span class="value">{fmt_txt(raw_remark)}</span></div>'
             
             maint_cards.append(f"""
             <div class="card">
-                <div class="card-title"><span>{p_name} <span class="tag">{bu}</span></span></div>
-                <div class="grid-2" style="margin-top:14px;">
-                    <div>
-                        <div class="field-row"><span class="label">运维周期:</span> <span class="value">{cycle}</span></div>
-                        <div class="field-row" style="margin-top:12px;"><span class="label">备注说明:</span><br><span class="value">{remark}</span></div>
-                    </div>
-                    <div class="highlight-block highlight-attention" style="margin-top:0;">
-                        <div class="field-row" style="margin-bottom:0;">
-                            <span class="label">本周进度及关注事项:</span><br><br>
-                            <span class="value">{progress_matters}</span>
+                <div class="card-title" style="margin-bottom:10px; padding-bottom:10px;">
+                    <span>{p_name} <span class="tag">{bu}</span></span>
+                    <span style="font-size:13.5px; color:#64748B; font-weight:400;">
+                        <span class="label" style="font-size:13.5px;">运维周期:</span> <span class="value" style="font-weight:500;">{cycle}</span>
+                    </span>
+                </div>
+                {f'<div style="margin-bottom:12px; padding:0 2px;">{remark_html}</div>' if remark_html else ''}
+                <div class="highlight-block highlight-attention" style="margin-top:0; width:100%;">
+                    <div class="field-row" style="margin-bottom:0;">
+                        <div style="font-weight:600; color:#1D4ED8; font-size:14.5px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                            <span>📌 本周进度及关注事项</span>
                         </div>
+                        <div class="value" style="line-height:1.75; font-size:14.5px;">{progress_matters}</div>
                     </div>
                 </div>
             </div>
