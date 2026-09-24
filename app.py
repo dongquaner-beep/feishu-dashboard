@@ -84,7 +84,7 @@ GTS_LOGO_SVG = """
 </span>
 """
 
-# 3. 注入全局样式与大图预览 Lightbox CSS
+# 3. 注入全局样式与多图自适应网格 CSS
 render_html(f"""
 <style>
 /* 全局微光渐变背景 */
@@ -519,13 +519,13 @@ div.st-key-floating_refresh_btn button p {{
     border: 1px solid #FCA5A5;
 }}
 
-/* ================= 核心：缩略图悬浮放大大图提示 ================= */
+/* ================= 核心：缩略图悬浮放大大图提示与智能网格 ================= */
 .img-grid {{
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 18px;
     margin-top: 16px;
-    align-items: start;
+    align-items: stretch;
 }}
 .img-card {{
     background: #ffffff;
@@ -536,7 +536,7 @@ div.st-key-floating_refresh_btn button p {{
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 10px;
+    padding: 12px;
     position: relative !important;
     cursor: zoom-in !important;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -548,8 +548,8 @@ div.st-key-floating_refresh_btn button p {{
 .img-card::after {{
     content: '🔍 点击放大预览';
     position: absolute;
-    bottom: 12px;
-    right: 14px;
+    bottom: 14px;
+    right: 16px;
     background: rgba(15, 23, 42, 0.78);
     color: #ffffff;
     font-size: 12px;
@@ -569,7 +569,7 @@ div.st-key-floating_refresh_btn button p {{
 .img-card img {{
     width: 100%;
     height: auto;
-    max-height: 480px;
+    max-height: 520px;
     object-fit: contain;
     border-radius: 8px;
     display: block;
@@ -599,7 +599,6 @@ div.st-key-floating_refresh_btn button p {{
     opacity: 1 !important;
 }}
 
-/* 顶部操作条（退出按钮 + 标题） */
 .gts-lb-header {{
     position: absolute !important;
     top: 18px !important;
@@ -641,7 +640,6 @@ div.st-key-floating_refresh_btn button p {{
     backdrop-filter: blur(8px) !important;
 }}
 
-/* 图片主舞台 */
 .gts-lb-stage {{
     position: relative !important;
     width: 100% !important;
@@ -663,7 +661,6 @@ div.st-key-floating_refresh_btn button p {{
     transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease !important;
 }}
 
-/* 左右翻页按钮（对标飞书查看器，纯白微光圆钮） */
 .gts-lb-arrow {{
     position: absolute !important;
     top: 50% !important;
@@ -691,7 +688,6 @@ div.st-key-floating_refresh_btn button p {{
 .gts-lb-arrow-prev {{ left: 28px !important; }}
 .gts-lb-arrow-next {{ right: 28px !important; }}
 
-/* 底部页码指示器 */
 .gts-lb-footer {{
     position: absolute !important;
     bottom: 22px !important;
@@ -855,7 +851,7 @@ def to_base64_image(img_url, token=""):
         pass
     return img_url
 
-# 穿透读取“统计图-图片”多图附件数组
+# ================= 核心修复：四重严密去重机制（过滤重复上传的相同图片） =================
 def extract_image_urls(row, token=""):
     raw_fields = row.get("_raw_fields") if isinstance(row, dict) else (row["_raw_fields"] if "_raw_fields" in row else {})
     if not isinstance(raw_fields, dict):
@@ -864,6 +860,7 @@ def extract_image_urls(row, token=""):
     candidate_cols = ["统计图-图片", "统计图", "图片", "图表", "附件"]
     target_raw_val = None
     
+    # 严格匹配“统计图-图片”列
     for cand in candidate_cols:
         for k, v in raw_fields.items():
             if cand in str(k) and v:
@@ -873,18 +870,46 @@ def extract_image_urls(row, token=""):
             break
             
     urls = []
+    seen_names = set()
+    seen_tokens = set()
+    seen_urls = set()
+    
     if isinstance(target_raw_val, list):
         for item in target_raw_val:
             if isinstance(item, dict):
+                # 1. 第一重排重：按文件名去重（ScreenShot_..._467.png 即使上传 3 次也只取第 1 次）
+                fname = item.get("name")
+                ftoken = item.get("file_token")
+                if fname:
+                    clean_fn = str(fname).strip().lower()
+                    if clean_fn in seen_names:
+                        continue
+                    seen_names.add(clean_fn)
+                # 2. 第二重排重：按 file_token 去重
+                if ftoken:
+                    clean_ft = str(ftoken).strip()
+                    if clean_ft in seen_tokens:
+                        continue
+                    seen_tokens.add(clean_ft)
+                    
                 u = item.get("url") or item.get("tmp_url") or item.get("download_url")
-                if not u and item.get("file_token"):
-                    u = f"https://open.feishu.cn/open-apis/drive/v1/medias/{item['file_token']}/download"
+                if not u and ftoken:
+                    u = f"https://open.feishu.cn/open-apis/drive/v1/medias/{ftoken}/download"
                 if u and str(u).startswith("http"):
-                    urls.append(str(u).strip())
+                    clean_u = str(u).strip()
+                    if clean_u not in seen_urls:
+                        seen_urls.add(clean_u)
+                        urls.append(clean_u)
             elif isinstance(item, str) and item.startswith("http"):
-                urls.append(item.strip())
+                clean_u = item.strip()
+                if clean_u not in seen_urls:
+                    seen_urls.add(clean_u)
+                    urls.append(clean_u)
     elif isinstance(target_raw_val, str) and target_raw_val.startswith("http"):
-        urls.append(target_raw_val.strip())
+        clean_u = target_raw_val.strip()
+        if clean_u not in seen_urls:
+            seen_urls.add(clean_u)
+            urls.append(clean_u)
         
     if not urls:
         for cand in candidate_cols:
@@ -893,14 +918,21 @@ def extract_image_urls(row, token=""):
                 val_str = str(row[col_name]).strip()
                 for part in val_str.split(" / "):
                     part = part.strip()
-                    if part.startswith("http://") or part.startswith("https://"):
+                    if (part.startswith("http://") or part.startswith("https://")) and part not in seen_urls:
+                        seen_urls.add(part)
                         urls.append(part)
                         
+    # 3. 第三重/第四重排重：按 Base64 数据内容指纹排重（确保绝对零重复图片）
     b64_urls = []
+    seen_hashes = set()
     for u in urls:
         b64 = to_base64_image(u, token)
         if b64:
-            b64_urls.append(b64)
+            # 提取头尾与长度作为高灵敏度指纹
+            img_fingerprint = f"{len(b64)}_{b64[:120]}_{b64[-120:]}"
+            if img_fingerprint not in seen_hashes:
+                seen_hashes.add(img_fingerprint)
+                b64_urls.append(b64)
             
     return b64_urls
 
@@ -1098,7 +1130,6 @@ function setupGtsLightbox() {
         const doc = window.parent.document;
         if (!doc) return;
 
-        // 1. 初始化弹窗结构（只注入一次）
         let modal = doc.getElementById('gts-lightbox-modal');
         if (!modal) {
             modal = doc.createElement('div');
@@ -1125,7 +1156,6 @@ function setupGtsLightbox() {
             doc.body.appendChild(modal);
         }
 
-        // 2. 状态变量与方法
         let currentGallery = [];
         let currentIndex = 0;
         let currentTitle = "";
@@ -1153,7 +1183,6 @@ function setupGtsLightbox() {
             titleEl.textContent = item.title || currentTitle;
             counterEl.textContent = `${currentIndex + 1} / ${currentGallery.length}`;
 
-            // 只有 1 张图时自动隐藏左右翻页箭头
             if (currentGallery.length <= 1) {
                 prevBtn.style.display = 'none';
                 nextBtn.style.display = 'none';
@@ -1188,7 +1217,6 @@ function setupGtsLightbox() {
             renderCurrentImage();
         }
 
-        // 绑定弹窗自身操作（关闭、翻页、背景点击、键盘 ESC/左右键）
         if (!modal._eventsBound) {
             closeBtn.onclick = closeModal;
             prevBtn.onclick = (e) => { e.stopPropagation(); showPrev(); };
@@ -1205,7 +1233,6 @@ function setupGtsLightbox() {
             modal._eventsBound = true;
         }
 
-        // 3. 事件委托：捕获页面上所有标记了 .lightbox-trigger 的缩略图点击
         if (!doc._gtsImgClickBound) {
             doc.body.addEventListener('click', (e) => {
                 const target = e.target.closest('.lightbox-trigger');
@@ -1395,7 +1422,7 @@ elif current_tab_id == "finish":
         fin_cards.append('</div>')
         render_html("\n".join(fin_cards))
 
-# ==================== Tab 4：其他事项汇总（支持大图全屏预览与左右翻页） ====================
+# ==================== Tab 4：其他事项汇总（双图并排 + 排重保护） ====================
 elif current_tab_id == "other":
     df_dev_all = DATA_HUB["dev_all"]
     df_non_del = DATA_HUB["non_del"]
@@ -1489,7 +1516,7 @@ elif current_tab_id == "other":
                 cur_prog = fmt_txt(drow.get(col_dev_cur))
                 next_plan = fmt_txt(drow.get(col_dev_next))
                 
-                # 动态获取飞书多维表格图片并赋予画廊分组 ID
+                # 动态获取飞书多维表格图片（四重严密去重）
                 img_urls = extract_image_urls(drow, current_feishu_token)
                 img_tag_html = ""
                 if img_urls:
