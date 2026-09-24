@@ -13,14 +13,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. 飞书凭据配置（纯 Secrets 安全读取，代码中零明文）
+# 2. 飞书凭据配置（安全读取 Streamlit Secrets 保险箱，杜绝明文泄露）
 try:
     APP_ID = st.secrets["APP_ID"]
     APP_SECRET = st.secrets["APP_SECRET"]
     APP_TOKEN = st.secrets["APP_TOKEN"]
 except Exception:
-    st.error("🚨 未检测到飞书安全凭据配置，请在 Streamlit Cloud 后台的 Settings -> Secrets 中录入密钥！")
-    st.stop()
+    APP_ID = st.secrets.get("APP_ID", "")
+    APP_SECRET = st.secrets.get("APP_SECRET", "")
+    APP_TOKEN = st.secrets.get("APP_TOKEN", "")
 
 TABLE_LIFE_ID = "tblfMcfAnXH3luI7"
 VIEW_DELIVERY = "vewSu37vul"    # 交付中项目
@@ -28,7 +29,7 @@ VIEW_MAINT = "vew4u7e0fo"       # 运维中项目
 VIEW_FINISH = "vewwcbPapg"      # 已完结/挂起项目
 
 TABLE_DEV_ID = "tblYtSIkGK07Na1M"
-VIEW_DEV_PROD = "vewV4IWr91"    # 自研产品
+VIEW_DEV_PROD = "vewV4IWr91"    # 自研产品（包含运维工单平台）
 VIEW_DEV_SPEC = "vew1aFFPXR"    # 重点专项
 
 TABLE_NON_DEL_ID = "tbl9DVGuvIB6dOas"
@@ -83,7 +84,7 @@ GTS_LOGO_SVG = """
 </span>
 """
 
-# 3. 注入全局样式
+# 3. 注入全局样式与大图预览 Lightbox CSS
 render_html(f"""
 <style>
 /* 全局微光渐变背景 */
@@ -111,14 +112,13 @@ header[data-testid="stHeader"] {{
     display: none !important;
 }}
 
-/* 隐藏应用内多余元素 */
 [data-testid="manage-app-button"],
 footer {{
     display: none !important;
     visibility: hidden !important;
 }}
 
-/* ================= 侧边栏结构：锁定 {sb_width}px ================= */
+/* 侧边栏结构：精准锁定 {sb_width}px */
 section[data-testid="stSidebar"] {{
     position: fixed !important;
     top: 0 !important;
@@ -140,19 +140,16 @@ section[data-testid="stSidebar"] {{
     overflow-x: hidden !important;
 }}
 
-/* 主内容区域跟随侧边栏平滑避让 */
 [data-testid="stMain"], .main {{
     margin-left: {sb_width}px !important;
     width: calc(100% - {sb_width}px) !important;
     max-width: calc(100% - {sb_width}px) !important;
 }}
 
-/* 侧边栏内边距 */
 section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{
     padding: {"14px 8px" if st.session_state.sidebar_collapsed else "20px 14px"} !important;
 }}
 
-/* 侧边栏标题 */
 .sidebar-title {{
     font-size: 18px;
     font-weight: 700;
@@ -216,7 +213,7 @@ div[class*="st-key-toggle_sidebar_btn"] button p {{
     text-align: center !important;
 }}
 
-/* 展开状态导航胶囊 */
+/* 导航胶囊按钮 */
 div[class*="st-key-nav_exp_"] button {{
     border-radius: 12px !important;
     padding: 10px 14px !important;
@@ -335,7 +332,7 @@ div[class*="st-key-nav_col_"] button[kind="primary"] p {{
     color: #1E293B;
 }}
 
-/* 右下角专属悬浮刷新胶囊（FAB） */
+/* 右下角悬浮刷新胶囊 */
 div.st-key-floating_refresh_btn button {{
     position: fixed !important;
     bottom: 56px !important;
@@ -522,16 +519,195 @@ div.st-key-floating_refresh_btn button p {{
     border: 1px solid #FCA5A5;
 }}
 
-.img-container img {{
-    width: 100%;
-    max-height: 460px;
-    object-fit: contain;
-    border-radius: 14px;
-    margin-top: 14px;
-    border: 1px solid #E2E8F0;
-    box-shadow: 0 6px 20px rgba(15, 23, 42, .06);
-    background: #fff;
+/* ================= 核心：缩略图悬浮放大大图提示 ================= */
+.img-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+    align-items: start;
 }}
+.img-card {{
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid #E2E8F0;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    position: relative !important;
+    cursor: zoom-in !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}}
+.img-card:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}}
+.img-card::after {{
+    content: '🔍 点击放大预览';
+    position: absolute;
+    bottom: 12px;
+    right: 14px;
+    background: rgba(15, 23, 42, 0.78);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 99px;
+    opacity: 0;
+    backdrop-filter: blur(6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    transform: translateY(4px);
+    pointer-events: none;
+}}
+.img-card:hover::after {{
+    opacity: 1;
+    transform: translateY(0);
+}}
+.img-card img {{
+    width: 100%;
+    height: auto;
+    max-height: 480px;
+    object-fit: contain;
+    border-radius: 8px;
+    display: block;
+}}
+
+/* ================= 核心：大屏专属 Lightbox 模态弹窗样式 ================= */
+#gts-lightbox-modal {{
+    display: none;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(15, 23, 42, 0.90) !important;
+    backdrop-filter: blur(18px) !important;
+    -webkit-backdrop-filter: blur(18px) !important;
+    z-index: 2147483647 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-direction: column !important;
+    opacity: 0;
+    transition: opacity 0.22s ease !important;
+    user-select: none !important;
+}}
+#gts-lightbox-modal.active {{
+    display: flex !important;
+    opacity: 1 !important;
+}}
+
+/* 顶部操作条（退出按钮 + 标题） */
+.gts-lb-header {{
+    position: absolute !important;
+    top: 18px !important;
+    left: 24px !important;
+    right: 24px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    z-index: 100 !important;
+}}
+.gts-lb-close-btn {{
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    color: #ffffff !important;
+    border-radius: 99px !important;
+    padding: 7px 18px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    backdrop-filter: blur(10px) !important;
+    transition: all 0.2s ease !important;
+}}
+.gts-lb-close-btn:hover {{
+    background: rgba(239, 68, 68, 0.9) !important;
+    border-color: rgba(239, 68, 68, 1) !important;
+    transform: scale(1.05) !important;
+}}
+.gts-lb-title {{
+    color: #F8FAFC !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    background: rgba(30, 41, 59, 0.7) !important;
+    padding: 6px 18px !important;
+    border-radius: 99px !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    backdrop-filter: blur(8px) !important;
+}}
+
+/* 图片主舞台 */
+.gts-lb-stage {{
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 70px 80px 60px 80px !important;
+    box-sizing: border-box !important;
+}}
+.gts-lb-img {{
+    max-width: 88vw !important;
+    max-height: 82vh !important;
+    object-fit: contain !important;
+    border-radius: 12px !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    background: #ffffff !important;
+    transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease !important;
+}}
+
+/* 左右翻页按钮（对标飞书查看器，纯白微光圆钮） */
+.gts-lb-arrow {{
+    position: absolute !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 50px !important;
+    height: 50px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid #E2E8F0 !important;
+    color: #1E293B !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    z-index: 100 !important;
+}}
+.gts-lb-arrow:hover {{
+    background: #4F46E5 !important;
+    color: #ffffff !important;
+    transform: translateY(-50%) scale(1.12) !important;
+    box-shadow: 0 12px 32px rgba(79, 70, 229, 0.45) !important;
+}}
+.gts-lb-arrow-prev {{ left: 28px !important; }}
+.gts-lb-arrow-next {{ right: 28px !important; }}
+
+/* 底部页码指示器 */
+.gts-lb-footer {{
+    position: absolute !important;
+    bottom: 22px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    background: rgba(255, 255, 255, 0.18) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    padding: 5px 16px !important;
+    border-radius: 99px !important;
+    color: #FFFFFF !important;
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    backdrop-filter: blur(10px) !important;
+    z-index: 100 !important;
+}}
+
 .spec-table {{ width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 14px; border-radius: 12px; overflow: hidden; border: 1px solid #E2E8F0; background: #fff; box-shadow: 0 4px 16px rgba(15, 23, 42, .03); }}
 .spec-table th, .spec-table td {{ padding: 11px 16px; font-size: 14px; line-height: 1.6; border-bottom: 1px solid #E2E8F0; font-weight: 400; color: #334155; }}
 .spec-table th {{ font-weight: 600; color: #1E1B4B; background: #EEF2FF; }}
@@ -633,37 +809,105 @@ def find_column(df, candidates):
                 return col
     return None
 
+# 获取并缓存飞书 tenant_access_token
+@st.cache_data(ttl=7000)
+def get_feishu_token():
+    if not APP_ID or not APP_SECRET:
+        return ""
+    token_url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+    try:
+        t_res = requests.post(token_url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
+        if t_res.get("code") == 0:
+            return t_res.get("tenant_access_token", "")
+    except Exception:
+        pass
+    return ""
+
+# 智能转换 Base64 图片
 @st.cache_data(ttl=3600)
-def to_base64_image(img_url):
+def to_base64_image(img_url, token=""):
     if not img_url or not str(img_url).startswith("http"):
         return img_url
     try:
-        res = requests.get(img_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        if res.status_code == 200 and len(res.content) > 200:
-            b64 = base64.b64encode(res.content).decode("utf-8")
-            ctype = res.headers.get("Content-Type", "image/png")
-            return f"data:{ctype};base64,{b64}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        res = requests.get(img_url, headers=headers, timeout=20, allow_redirects=True)
+        if res.status_code == 200 and len(res.content) > 100:
+            ctype = res.headers.get("Content-Type", "image/png").lower()
+            if "json" in ctype:
+                try:
+                    jdata = res.json()
+                    tmp_urls = jdata.get("data", {}).get("tmp_download_urls", [])
+                    if tmp_urls and "tmp_download_url" in tmp_urls[0]:
+                        real_url = tmp_urls[0]["tmp_download_url"]
+                        r2 = requests.get(real_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+                        if r2.status_code == 200 and len(r2.content) > 100:
+                            b64 = base64.b64encode(r2.content).decode("utf-8")
+                            ctype2 = r2.headers.get("Content-Type", "image/png")
+                            return f"data:{ctype2};base64,{b64}"
+                except Exception:
+                    pass
+            else:
+                b64 = base64.b64encode(res.content).decode("utf-8")
+                return f"data:{ctype};base64,{b64}"
     except Exception:
         pass
     return img_url
 
-def extract_image_url(row, p_title=""):
-    default_workorder_img = "https://internal-api-drive-stream.feishu.cn/space/api/box/stream/download/preview/Qt6pbnTeNo3Y9DxuERlcPPAZnIh?extra=%7B%22bitablePerm%22%3A%7B%22tableId%22%3A%22tblYtSIkGK07Na1M%22%2C%22rev%22%3A146%2C%22attachments%22%3A%7B%22fldt82h6VW%22%3A%7B%22recvuTXB4GVwCg%22%3A%5B%22Qt6pbnTeNo3Y9DxuERlcPPAZnIh%22%5D%7D%7D%7D%7D&mount_point=bitable&preview_type=16&version=7685209289593572280"
-    for col in ["统计图", "统计图-图片", "图片", "图表"]:
-        if col in row and row[col]:
-            val = str(row[col]).strip()
-            if val.startswith("http://") or val.startswith("https://"):
-                return to_base64_image(val)
-    if "工单" in p_title:
-        return to_base64_image(default_workorder_img)
-    return None
+# 穿透读取“统计图-图片”多图附件数组
+def extract_image_urls(row, token=""):
+    raw_fields = row.get("_raw_fields") if isinstance(row, dict) else (row["_raw_fields"] if "_raw_fields" in row else {})
+    if not isinstance(raw_fields, dict):
+        raw_fields = {}
+        
+    candidate_cols = ["统计图-图片", "统计图", "图片", "图表", "附件"]
+    target_raw_val = None
+    
+    for cand in candidate_cols:
+        for k, v in raw_fields.items():
+            if cand in str(k) and v:
+                target_raw_val = v
+                break
+        if target_raw_val:
+            break
+            
+    urls = []
+    if isinstance(target_raw_val, list):
+        for item in target_raw_val:
+            if isinstance(item, dict):
+                u = item.get("url") or item.get("tmp_url") or item.get("download_url")
+                if not u and item.get("file_token"):
+                    u = f"https://open.feishu.cn/open-apis/drive/v1/medias/{item['file_token']}/download"
+                if u and str(u).startswith("http"):
+                    urls.append(str(u).strip())
+            elif isinstance(item, str) and item.startswith("http"):
+                urls.append(item.strip())
+    elif isinstance(target_raw_val, str) and target_raw_val.startswith("http"):
+        urls.append(target_raw_val.strip())
+        
+    if not urls:
+        for cand in candidate_cols:
+            col_name = find_column(pd.DataFrame([row]), [cand])
+            if col_name and col_name in row and row[col_name]:
+                val_str = str(row[col_name]).strip()
+                for part in val_str.split(" / "):
+                    part = part.strip()
+                    if part.startswith("http://") or part.startswith("https://"):
+                        urls.append(part)
+                        
+    b64_urls = []
+    for u in urls:
+        b64 = to_base64_image(u, token)
+        if b64:
+            b64_urls.append(b64)
+            
+    return b64_urls
 
 def fetch_feishu_view(table_id, view_id=None):
-    token_url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
-    t_res = requests.post(token_url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
-    if t_res.get("code") != 0:
+    token = get_feishu_token()
+    if not token or not APP_TOKEN:
         return pd.DataFrame()
-    token = t_res["tenant_access_token"]
     
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
     headers = {"Authorization": f"Bearer {token}"}
@@ -676,14 +920,17 @@ def fetch_feishu_view(table_id, view_id=None):
             params["view_id"] = view_id
         if page_token:
             params["page_token"] = page_token
-        res = requests.get(url, headers=headers, params=params, timeout=15).json()
-        if res.get("code") != 0:
+        try:
+            res = requests.get(url, headers=headers, params=params, timeout=15).json()
+            if res.get("code") != 0:
+                break
+            items = res.get("data", {}).get("items", [])
+            all_records.extend(items)
+            if not res.get("data", {}).get("has_more", False):
+                break
+            page_token = res.get("data", {}).get("page_token")
+        except Exception:
             break
-        items = res.get("data", {}).get("items", [])
-        all_records.extend(items)
-        if not res.get("data", {}).get("has_more", False):
-            break
-        page_token = res.get("data", {}).get("page_token")
         
     if not all_records:
         return pd.DataFrame()
@@ -691,7 +938,7 @@ def fetch_feishu_view(table_id, view_id=None):
     cleaned_rows = []
     for r in all_records:
         raw_f = r.get("fields", {})
-        row = {}
+        row = {"_raw_fields": raw_f}
         for k, v in raw_f.items():
             row[k] = clean_cell_value(v)
         cleaned_rows.append(row)
@@ -800,7 +1047,6 @@ def parse_complaint_data(df):
 # ----------------- 6. 侧边栏：状态化 240px 展开 / 68px 纯图标坞 -----------------
 with st.sidebar:
     if not st.session_state.sidebar_collapsed:
-        # A. 展开模式：标题 + 精致对齐的收起按钮 «
         c_title, c_toggle = st.columns([3.8, 1.2])
         with c_title:
             render_html('<span class="sidebar-title">GTS 周会汇报</span>')
@@ -816,7 +1062,6 @@ with st.sidebar:
                 st.session_state.active_tab_idx = i
                 st.rerun()
     else:
-        # B. 收起模式：居中对齐展开按钮 » + 纯单图标（100% 居中，零截断）
         if st.button("»", key="toggle_sidebar_btn", help="展开完整导航"):
             st.session_state.sidebar_collapsed = False
             st.rerun()
@@ -828,10 +1073,9 @@ with st.sidebar:
                 st.session_state.active_tab_idx = i
                 st.rerun()
 
-# 当前激活板块 ID
 current_tab_id = NAV_TABS[st.session_state.active_tab_idx]["id"]
 
-# ----------------- 7. 页面顶部纯净大标题（内嵌 GTS 科技矢量徽标） -----------------
+# ----------------- 7. 页面顶部纯净大标题 -----------------
 render_html(f'''
 <div class="report-header">
     {GTS_LOGO_SVG}
@@ -839,12 +1083,163 @@ render_html(f'''
 </div>
 ''')
 
-# ----------------- 8. 右下角专属悬浮刷新胶囊（点击时才触发真正同步） -----------------
+# ----------------- 8. 右下角专属悬浮刷新胶囊 -----------------
 if st.button("🔄 刷新数据", key="floating_refresh_btn"):
     st.cache_data.clear()
     if "data_hub" in st.session_state:
         del st.session_state["data_hub"]
     st.rerun()
+
+# ==================== 核心：全屏 Lightbox 大图预览脚本驱动 ====================
+components.html("""
+<script>
+function setupGtsLightbox() {
+    try {
+        const doc = window.parent.document;
+        if (!doc) return;
+
+        // 1. 初始化弹窗结构（只注入一次）
+        let modal = doc.getElementById('gts-lightbox-modal');
+        if (!modal) {
+            modal = doc.createElement('div');
+            modal.id = 'gts-lightbox-modal';
+            modal.innerHTML = `
+                <div class="gts-lb-header">
+                    <button class="gts-lb-close-btn" id="gts-lb-close">✕ 退出</button>
+                    <div class="gts-lb-title" id="gts-lb-title">图片大屏预览</div>
+                    <div style="width: 72px;"></div>
+                </div>
+                <div class="gts-lb-arrow gts-lb-arrow-prev" id="gts-lb-prev" title="上一张 (←)">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </div>
+                <div class="gts-lb-stage" id="gts-lb-stage">
+                    <img class="gts-lb-img" id="gts-lb-img" src="" alt="预览大图">
+                </div>
+                <div class="gts-lb-arrow gts-lb-arrow-next" id="gts-lb-next" title="下一张 (→)">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+                <div class="gts-lb-footer" id="gts-lb-footer">
+                    <span id="gts-lb-counter">1 / 1</span>
+                </div>
+            `;
+            doc.body.appendChild(modal);
+        }
+
+        // 2. 状态变量与方法
+        let currentGallery = [];
+        let currentIndex = 0;
+        let currentTitle = "";
+
+        const imgEl = doc.getElementById('gts-lb-img');
+        const titleEl = doc.getElementById('gts-lb-title');
+        const counterEl = doc.getElementById('gts-lb-counter');
+        const prevBtn = doc.getElementById('gts-lb-prev');
+        const nextBtn = doc.getElementById('gts-lb-next');
+        const closeBtn = doc.getElementById('gts-lb-close');
+        const stageEl = doc.getElementById('gts-lb-stage');
+
+        function renderCurrentImage() {
+            if (!currentGallery || currentGallery.length === 0) return;
+            const item = currentGallery[currentIndex];
+            imgEl.style.opacity = '0';
+            imgEl.style.transform = 'scale(0.97)';
+            setTimeout(() => {
+                imgEl.src = item.src;
+                imgEl.alt = item.title || currentTitle;
+                imgEl.style.opacity = '1';
+                imgEl.style.transform = 'scale(1)';
+            }, 80);
+
+            titleEl.textContent = item.title || currentTitle;
+            counterEl.textContent = `${currentIndex + 1} / ${currentGallery.length}`;
+
+            // 只有 1 张图时自动隐藏左右翻页箭头
+            if (currentGallery.length <= 1) {
+                prevBtn.style.display = 'none';
+                nextBtn.style.display = 'none';
+            } else {
+                prevBtn.style.display = 'flex';
+                nextBtn.style.display = 'flex';
+            }
+        }
+
+        function openModal(gallery, index, title) {
+            currentGallery = gallery;
+            currentIndex = index;
+            currentTitle = title;
+            renderCurrentImage();
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            modal.classList.remove('active');
+            imgEl.src = '';
+        }
+
+        function showPrev() {
+            if (currentGallery.length <= 1) return;
+            currentIndex = (currentIndex - 1 + currentGallery.length) % currentGallery.length;
+            renderCurrentImage();
+        }
+
+        function showNext() {
+            if (currentGallery.length <= 1) return;
+            currentIndex = (currentIndex + 1) % currentGallery.length;
+            renderCurrentImage();
+        }
+
+        // 绑定弹窗自身操作（关闭、翻页、背景点击、键盘 ESC/左右键）
+        if (!modal._eventsBound) {
+            closeBtn.onclick = closeModal;
+            prevBtn.onclick = (e) => { e.stopPropagation(); showPrev(); };
+            nextBtn.onclick = (e) => { e.stopPropagation(); showNext(); };
+            stageEl.onclick = (e) => { if (e.target === stageEl) closeModal(); };
+            modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+
+            doc.addEventListener('keydown', (e) => {
+                if (!modal.classList.contains('active')) return;
+                if (e.key === 'Escape') closeModal();
+                else if (e.key === 'ArrowLeft') showPrev();
+                else if (e.key === 'ArrowRight') showNext();
+            });
+            modal._eventsBound = true;
+        }
+
+        // 3. 事件委托：捕获页面上所有标记了 .lightbox-trigger 的缩略图点击
+        if (!doc._gtsImgClickBound) {
+            doc.body.addEventListener('click', (e) => {
+                const target = e.target.closest('.lightbox-trigger');
+                if (!target) return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                const galleryId = target.getAttribute('data-gallery');
+                const targetIndex = parseInt(target.getAttribute('data-index') || '0', 10);
+                const title = target.getAttribute('data-title') || '统计图预览';
+
+                let allImgs = [];
+                if (galleryId) {
+                    const groupElements = doc.querySelectorAll(`.lightbox-trigger[data-gallery="${galleryId}"]`);
+                    groupElements.forEach((el, idx) => {
+                        allImgs.push({
+                            src: el.getAttribute('src'),
+                            title: el.getAttribute('data-title') || `${title} (${idx+1})`
+                        });
+                    });
+                } else {
+                    allImgs = [{ src: target.getAttribute('src'), title: title }];
+                }
+
+                openModal(allImgs, targetIndex, title);
+            });
+            doc._gtsImgClickBound = true;
+        }
+    } catch(e) {}
+}
+setTimeout(setupGtsLightbox, 300);
+setTimeout(setupGtsLightbox, 1200);
+</script>
+""", height=0, width=0)
 
 # ==================== Tab 1：交付中项目 ====================
 if current_tab_id == "delivery":
@@ -927,7 +1322,7 @@ if current_tab_id == "delivery":
         </div>
         """)
 
-# ==================== Tab 2：运维中项目（全新通栏排版，彻底消除左侧空白） ====================
+# ==================== Tab 2：运维中项目 ====================
 elif current_tab_id == "maint":
     df_maint = DATA_HUB["maint"]
     if df_maint.empty:
@@ -945,7 +1340,6 @@ elif current_tab_id == "maint":
             raw_remark = safe_val(row.get("备注说明"), "-")
             progress_matters = fmt_txt(row.get("本周进度及关注事项"))
             
-            # 备注说明智能收纳：非空且不是 '-' 时以轻量标签跟在周期后方，为空时不占多余版面
             remark_html = ""
             if raw_remark != "-":
                 remark_html = f'<div style="font-size:13.5px; color:#64748B;"><span class="label" style="font-size:13.5px;">备注说明:</span> <span class="value">{fmt_txt(raw_remark)}</span></div>'
@@ -1001,11 +1395,12 @@ elif current_tab_id == "finish":
         fin_cards.append('</div>')
         render_html("\n".join(fin_cards))
 
-# ==================== Tab 4：其他事项汇总 ====================
+# ==================== Tab 4：其他事项汇总（支持大图全屏预览与左右翻页） ====================
 elif current_tab_id == "other":
     df_dev_all = DATA_HUB["dev_all"]
     df_non_del = DATA_HUB["non_del"]
     df_complaint = DATA_HUB["complaint"]
+    current_feishu_token = get_feishu_token()
 
     non_del_summary_map = parse_non_delivery_data(df_non_del)
 
@@ -1013,7 +1408,7 @@ elif current_tab_id == "other":
     col_dev_cat = find_column(df_dev_all, ["分类", "类别"])
     col_dev_cur = find_column(df_dev_all, ["本周进度与建设情况", "本周进度", "建设情况"])
     col_dev_next = find_column(df_dev_all, ["下周工作计划", "下周计划", "工作计划"])
-    col_dev_group = find_column(df_dev_all, ["负责小组", "小组", "部门", "组别", "团队"])
+    col_dev_group = find_column(df_dev_all, ["负责小组", "小组", "部门", "负责部门", "团队", "组别"])
 
     groups_order = ["客户服务组", "IT组", "交付研发一组", "数据处理组", "交付研发二组"]
 
@@ -1087,15 +1482,31 @@ elif current_tab_id == "other":
 
         if not df_dev_all.empty and col_dev_group:
             matching_dev = df_dev_all[df_dev_all[col_dev_group].apply(normalize_group_name) == grp]
-            for _, drow in matching_dev.iterrows():
+            for c_idx, drow in matching_dev.iterrows():
                 has_content = True
                 p_title = safe_val(drow.get(col_dev_name), "专项产品")
                 cat_tag = safe_val(drow.get(col_dev_cat), "自研产品")
                 cur_prog = fmt_txt(drow.get(col_dev_cur))
                 next_plan = fmt_txt(drow.get(col_dev_next))
-                img_url = extract_image_url(drow, p_title)
-
-                img_tag_html = f'<div class="img-container"><img src="{img_url}" referrerpolicy="no-referrer" alt="{p_title}统计图"></div>' if img_url else ''
+                
+                # 动态获取飞书多维表格图片并赋予画廊分组 ID
+                img_urls = extract_image_urls(drow, current_feishu_token)
+                img_tag_html = ""
+                if img_urls:
+                    gallery_key = f"gal_{grp}_{c_idx}"
+                    cards_img = "".join([
+                        f'''<div class="img-card">
+                            <img src="{u}" 
+                                 class="lightbox-trigger" 
+                                 data-gallery="{gallery_key}" 
+                                 data-index="{idx}" 
+                                 data-title="{p_title} ({idx+1}/{len(img_urls)})" 
+                                 referrerpolicy="no-referrer" 
+                                 alt="{p_title}统计图 {idx+1}">
+                        </div>''' 
+                        for idx, u in enumerate(img_urls)
+                    ])
+                    img_tag_html = f'<div class="img-grid">{cards_img}</div>'
 
                 grp_cards.append(f"""
                 <div class="card">
