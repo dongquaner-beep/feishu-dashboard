@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 import pandas as pd
 import json
@@ -85,7 +86,7 @@ GTS_LOGO_SVG = """
 </span>
 """
 
-# 3. 注入全局样式与大屏 Lightbox 弹窗样式
+# 3. 注入全局样式与原生 Pure-CSS Lightbox 样式
 render_html(f"""
 <style>
 /* 全局微光渐变背景 */
@@ -520,7 +521,7 @@ div.st-key-floating_refresh_btn button p {{
     border: 1px solid #FCA5A5;
 }}
 
-/* ================= 核心：缩略图智能双列与悬浮放大提示 ================= */
+/* ================= 核心：缩略图 1:1 双列智能并排展示 ================= */
 .img-grid {{
     display: grid !important;
     grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important;
@@ -528,13 +529,15 @@ div.st-key-floating_refresh_btn button p {{
     margin-top: 16px !important;
     align-items: stretch !important;
 }}
-.img-card {{
+a.img-card {{
+    text-decoration: none !important;
+    color: inherit !important;
+    display: flex !important;
     background: #ffffff !important;
     border-radius: 14px !important;
     border: 1px solid #E2E8F0 !important;
     overflow: hidden !important;
     box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04) !important;
-    display: flex !important;
     justify-content: center !important;
     align-items: center !important;
     padding: 12px !important;
@@ -542,11 +545,11 @@ div.st-key-floating_refresh_btn button p {{
     cursor: zoom-in !important;
     transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }}
-.img-card:hover {{
+a.img-card:hover {{
     transform: translateY(-2px) !important;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08) !important;
 }}
-.img-card::after {{
+a.img-card::after {{
     content: '🔍 点击放大预览' !important;
     position: absolute !important;
     bottom: 14px !important;
@@ -563,11 +566,11 @@ div.st-key-floating_refresh_btn button p {{
     transform: translateY(4px) !important;
     pointer-events: none !important;
 }}
-.img-card:hover::after {{
+a.img-card:hover::after {{
     opacity: 1 !important;
     transform: translateY(0) !important;
 }}
-.img-card img {{
+a.img-card img {{
     width: 100% !important;
     height: auto !important;
     max-height: 500px !important;
@@ -576,15 +579,15 @@ div.st-key-floating_refresh_btn button p {{
     display: block !important;
 }}
 
-/* ================= 核心：原生大屏 Lightbox 弹窗样式（零跨域问题） ================= */
-#gts-lightbox-modal {{
+/* ================= 核心：原生纯 CSS3 `:target` 全屏预览大图（无需 JS，100% 绝不失效） ================= */
+.gts-lightbox-modal {{
     display: none;
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    background: rgba(15, 23, 42, 0.92) !important;
+    background: rgba(15, 23, 42, 0.94) !important;
     backdrop-filter: blur(18px) !important;
     -webkit-backdrop-filter: blur(18px) !important;
     z-index: 2147483647 !important;
@@ -593,19 +596,34 @@ div.st-key-floating_refresh_btn button p {{
     flex-direction: column !important;
     user-select: none !important;
 }}
-#gts-lightbox-modal.active {{
+/* 当点击任意缩略图时，CSS 原生触发 :target 激活全屏大图 */
+.gts-lightbox-modal:target {{
     display: flex !important;
 }}
 
+/* 点击背景任意空白处直接关闭 */
+.gts-lb-backdrop {{
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 10 !important;
+    cursor: zoom-out !important;
+    text-decoration: none !important;
+}}
+
+/* 顶部操作条（退出按钮 + 标题） */
 .gts-lb-header {{
     position: absolute !important;
-    top: 18px !important;
-    left: 24px !important;
-    right: 24px !important;
+    top: 20px !important;
+    left: 28px !important;
+    right: 28px !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
-    z-index: 100 !important;
+    z-index: 20 !important;
+    pointer-events: none !important;
 }}
 .gts-lb-close-btn {{
     background: rgba(255, 255, 255, 0.16) !important;
@@ -620,24 +638,29 @@ div.st-key-floating_refresh_btn button p {{
     align-items: center !important;
     gap: 6px !important;
     backdrop-filter: blur(10px) !important;
+    text-decoration: none !important;
+    pointer-events: auto !important;
     transition: all 0.2s ease !important;
 }}
 .gts-lb-close-btn:hover {{
     background: rgba(239, 68, 68, 0.9) !important;
     border-color: rgba(239, 68, 68, 1) !important;
+    color: #ffffff !important;
     transform: scale(1.05) !important;
 }}
 .gts-lb-title {{
     color: #F8FAFC !important;
     font-size: 15px !important;
     font-weight: 600 !important;
-    background: rgba(30, 41, 59, 0.7) !important;
-    padding: 6px 18px !important;
+    background: rgba(30, 41, 59, 0.75) !important;
+    padding: 6px 20px !important;
     border-radius: 99px !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
     backdrop-filter: blur(8px) !important;
+    pointer-events: auto !important;
 }}
 
+/* 图片主舞台 */
 .gts-lb-stage {{
     position: relative !important;
     width: 100% !important;
@@ -645,26 +668,29 @@ div.st-key-floating_refresh_btn button p {{
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 70px 80px 60px 80px !important;
+    padding: 70px 90px 60px 90px !important;
     box-sizing: border-box !important;
+    z-index: 15 !important;
+    pointer-events: none !important;
 }}
 .gts-lb-img {{
     max-width: 88vw !important;
     max-height: 82vh !important;
     object-fit: contain !important;
     border-radius: 12px !important;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
     background: #ffffff !important;
-    transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease !important;
+    pointer-events: auto !important;
 }}
 
+/* 左右翻页圆形白钮（对标飞书查看器交互） */
 .gts-lb-arrow {{
     position: absolute !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
-    width: 50px !important;
-    height: 50px !important;
+    width: 52px !important;
+    height: 52px !important;
     border-radius: 50% !important;
     background: rgba(255, 255, 255, 0.95) !important;
     border: 1px solid #E2E8F0 !important;
@@ -672,34 +698,40 @@ div.st-key-floating_refresh_btn button p {{
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    font-size: 32px !important;
+    font-weight: 300 !important;
+    line-height: 1 !important;
     cursor: pointer !important;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35) !important;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    z-index: 100 !important;
+    z-index: 20 !important;
+    text-decoration: none !important;
 }}
 .gts-lb-arrow:hover {{
     background: #4F46E5 !important;
     color: #ffffff !important;
-    transform: translateY(-50%) scale(1.12) !important;
-    box-shadow: 0 12px 32px rgba(79, 70, 229, 0.45) !important;
+    transform: translateY(-50%) scale(1.1) !important;
+    box-shadow: 0 12px 32px rgba(79, 70, 229, 0.5) !important;
 }}
-.gts-lb-arrow-prev {{ left: 28px !important; }}
-.gts-lb-arrow-next {{ right: 28px !important; }}
+.gts-lb-arrow-prev {{ left: 32px !important; }}
+.gts-lb-arrow-next {{ right: 32px !important; }}
 
+/* 底部页码指示器 */
 .gts-lb-footer {{
     position: absolute !important;
-    bottom: 22px !important;
+    bottom: 24px !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    background: rgba(255, 255, 255, 0.18) !important;
-    border: 1px solid rgba(255, 255, 255, 0.25) !important;
-    padding: 5px 16px !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    padding: 5px 18px !important;
     border-radius: 99px !important;
     color: #FFFFFF !important;
     font-size: 13.5px !important;
-    font-weight: 500 !important;
+    font-weight: 600 !important;
     backdrop-filter: blur(10px) !important;
-    z-index: 100 !important;
+    z-index: 20 !important;
+    pointer-events: none !important;
 }}
 
 .spec-table {{ width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 14px; border-radius: 12px; overflow: hidden; border: 1px solid #E2E8F0; background: #fff; box-shadow: 0 4px 16px rgba(15, 23, 42, .03); }}
@@ -708,104 +740,6 @@ div.st-key-floating_refresh_btn button p {{
 .ct0 {{ border-bottom: 0 !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }}
 .mt12 {{ margin-top: 10px; }}
 </style>
-""")
-
-# ================= 核心：主 DOM 弹窗容器与原生 JS 逻辑驱动（零跨域阻断） =================
-render_html("""
-<div id="gts-lightbox-modal">
-    <div class="gts-lb-header">
-        <button class="gts-lb-close-btn" onclick="window.gtsCloseLb()">✕ 退出</button>
-        <div class="gts-lb-title" id="gts-lb-title">图片大屏预览</div>
-        <div style="width: 72px;"></div>
-    </div>
-    <div class="gts-lb-arrow gts-lb-arrow-prev" id="gts-lb-prev" onclick="window.gtsPrevLb()" title="上一张 (←)">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-    </div>
-    <div class="gts-lb-stage" id="gts-lb-stage" onclick="if(event.target===this)window.gtsCloseLb()">
-        <img class="gts-lb-img" id="gts-lb-img" src="" alt="预览大图">
-    </div>
-    <div class="gts-lb-arrow gts-lb-arrow-next" id="gts-lb-next" onclick="window.gtsNextLb()" title="下一张 (→)">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-    </div>
-    <div class="gts-lb-footer" id="gts-lb-footer">
-        <span id="gts-lb-counter">1 / 1</span>
-    </div>
-</div>
-
-<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:none;" onerror="
-(function(){
-    window.gtsGalleries = window.gtsGalleries || {};
-    window.gtsCurGal = [];
-    window.gtsCurIdx = 0;
-    window.gtsCurTitle = '';
-
-    window.gtsOpenLb = function(galKey, idx, title) {
-        var gal = window.gtsGalleries[galKey] || [];
-        if(!gal || gal.length === 0) return;
-        window.gtsCurGal = gal;
-        window.gtsCurIdx = idx || 0;
-        window.gtsCurTitle = title || '';
-        window.gtsRenderLb();
-        var m = document.getElementById('gts-lightbox-modal');
-        if(m) m.classList.add('active');
-    };
-
-    window.gtsCloseLb = function() {
-        var m = document.getElementById('gts-lightbox-modal');
-        if(m) m.classList.remove('active');
-        var img = document.getElementById('gts-lb-img');
-        if(img) img.src = '';
-    };
-
-    window.gtsPrevLb = function() {
-        if(!window.gtsCurGal || window.gtsCurGal.length <= 1) return;
-        window.gtsCurIdx = (window.gtsCurIdx - 1 + window.gtsCurGal.length) % window.gtsCurGal.length;
-        window.gtsRenderLb();
-    };
-
-    window.gtsNextLb = function() {
-        if(!window.gtsCurGal || window.gtsCurGal.length <= 1) return;
-        window.gtsCurIdx = (window.gtsCurIdx + 1) % window.gtsCurGal.length;
-        window.gtsRenderLb();
-    };
-
-    window.gtsRenderLb = function() {
-        var item = window.gtsCurGal[window.gtsCurIdx];
-        if(!item) return;
-        var img = document.getElementById('gts-lb-img');
-        var titleEl = document.getElementById('gts-lb-title');
-        var counterEl = document.getElementById('gts-lb-counter');
-        var prevBtn = document.getElementById('gts-lb-prev');
-        var nextBtn = document.getElementById('gts-lb-next');
-
-        if(img) {
-            img.style.opacity = '0';
-            img.style.transform = 'scale(0.97)';
-            setTimeout(function() {
-                img.src = item.src;
-                img.style.opacity = '1';
-                img.style.transform = 'scale(1)';
-            }, 60);
-        }
-        if(titleEl) titleEl.textContent = item.title || window.gtsCurTitle;
-        if(counterEl) counterEl.textContent = (window.gtsCurIdx + 1) + ' / ' + window.gtsCurGal.length;
-
-        if(prevBtn) prevBtn.style.display = (window.gtsCurGal.length <= 1) ? 'none' : 'flex';
-        if(nextBtn) nextBtn.style.display = (window.gtsCurGal.length <= 1) ? 'none' : 'flex';
-    };
-
-    if(!window._gtsKeyBound) {
-        document.addEventListener('keydown', function(e) {
-            var m = document.getElementById('gts-lightbox-modal');
-            if(!m || !m.classList.contains('active')) return;
-            if(e.key === 'Escape') window.gtsCloseLb();
-            else if(e.key === 'ArrowLeft') window.gtsPrevLb();
-            else if(e.key === 'ArrowRight') window.gtsNextLb();
-        });
-        window._gtsKeyBound = true;
-    }
-})();
-" />
 """)
 
 # 4. 原生零报错防 nan 函数
@@ -915,7 +849,7 @@ def get_feishu_token():
         pass
     return ""
 
-# 智能转换 Base64 图片（返回 Base64 字符串与二进制 MD5）
+# 智能转换 Base64 图片（提取 Base64 字符串与二进制 MD5）
 @st.cache_data(ttl=3600)
 def fetch_base64_and_md5(img_url, token=""):
     if not img_url or not str(img_url).startswith("http"):
@@ -949,7 +883,7 @@ def fetch_base64_and_md5(img_url, token=""):
         pass
     return "", ""
 
-# ================= 核心修复：基于二进制 MD5 指纹的绝对精准去重 =================
+# ================= 核心修复：前置特征去重 + MD5 指纹绝对排重 =================
 def extract_image_urls(row, token=""):
     raw_fields = row.get("_raw_fields") if isinstance(row, dict) else (row["_raw_fields"] if "_raw_fields" in row else {})
     if not isinstance(raw_fields, dict):
@@ -974,27 +908,42 @@ def extract_image_urls(row, token=""):
                 break
                 
     raw_urls = []
+    seen_keys = set()
+    
     if isinstance(target_raw_val, list):
         for item in target_raw_val:
             if isinstance(item, dict):
                 u = item.get("tmp_url") or item.get("url") or item.get("download_url") or ""
                 ftoken = str(item.get("file_token") or item.get("token") or "").strip()
+                name = str(item.get("name") or item.get("file_name") or "").strip().lower()
+                
+                # 剔除历史旧测试 Token
                 if "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" in str(u) or "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" in ftoken:
                     continue
+                    
+                # 1. 前置特征过滤：去除文件名中的副本标记，相同文件直接排重
+                norm_name = re.sub(r'[\s_]*\(\d+\)', '', name)
+                norm_name = re.sub(r'[\s_]*副本', '', norm_name)
+                unique_key = norm_name if norm_name else ftoken
+                if unique_key:
+                    if unique_key in seen_keys:
+                        continue
+                    seen_keys.add(unique_key)
+                    
                 if not u and ftoken:
                     u = f"https://open.feishu.cn/open-apis/drive/v1/medias/{ftoken}/download"
                 if u and str(u).startswith("http"):
                     raw_urls.append(str(u).strip())
             elif isinstance(item, str) and item.startswith("http"):
                 u_str = item.strip()
-                if "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" not in u_str:
+                if "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" not in u_str and u_str not in raw_urls:
                     raw_urls.append(u_str)
     elif isinstance(target_raw_val, str) and target_raw_val.startswith("http"):
         u_str = target_raw_val.strip()
         if "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" not in u_str:
             raw_urls.append(u_str)
             
-    # 核心：通过图片真实二进制内容 MD5 进行绝对去重
+    # 2. 二进制 MD5 真实图像指纹排重
     b64_list = []
     seen_md5 = set()
     for u in raw_urls:
@@ -1005,7 +954,7 @@ def extract_image_urls(row, token=""):
             seen_md5.add(f_md5)
             b64_list.append(b64_str)
             
-    # 如果依然超过 2 张（比如手动截图了相同页面但尺寸微差），保留最新的前 2 张
+    # 确保只保留多维表格中真实的 2 张独立图表
     if len(b64_list) > 2:
         b64_list = b64_list[:2]
         
@@ -1351,7 +1300,7 @@ elif current_tab_id == "finish":
         fin_cards.append('</div>')
         render_html("\n".join(fin_cards))
 
-# ==================== Tab 4：其他事项汇总（原生大图预览 + 精准 2 图显示） ====================
+# ==================== Tab 4：其他事项汇总（原生纯 CSS 灯箱大图 + 精准 2 图） ====================
 elif current_tab_id == "other":
     df_dev_all = DATA_HUB["dev_all"]
     df_non_del = DATA_HUB["non_del"]
@@ -1364,13 +1313,14 @@ elif current_tab_id == "other":
     col_dev_cat = find_column(df_dev_all, ["分类", "类别"])
     col_dev_cur = find_column(df_dev_all, ["本周进度与建设情况", "本周进度", "建设情况"])
     col_dev_next = find_column(df_dev_all, ["下周工作计划", "下周计划", "工作计划"])
-    col_dev_group = find_column(df_dev_all, ["负责小组", "小组", "部门", "组别", "团队"])
+    col_dev_group = find_column(df_dev_all, ["负责小组", "小组", "部门", "负责部门", "团队", "组别"])
 
     groups_order = ["客户服务组", "IT组", "交付研发一组", "数据处理组", "交付研发二组"]
 
     for grp in groups_order:
         render_html(f'<h2 class="section-title"><span class="grad-text">{grp}</span></h2>')
         
+        # 交付研发二组（接诉即办统计图表 + 改进方案表）
         if grp == "交付研发二组":
             chart_list, plan_list = parse_complaint_data(df_complaint)
             if not chart_list:
@@ -1445,22 +1395,49 @@ elif current_tab_id == "other":
                 cur_prog = fmt_txt(drow.get(col_dev_cur))
                 next_plan = fmt_txt(drow.get(col_dev_next))
                 
-                # 严格提取并去重
+                # 严格去重读取图片
                 img_urls = extract_image_urls(drow, current_feishu_token)
                 img_tag_html = ""
                 if img_urls:
-                    gallery_key = f"gal_{grp}_{c_idx}"
-                    gal_data = json.dumps([{"src": u, "title": f"{p_title} ({idx+1}/{len(img_urls)})"} for idx, u in enumerate(img_urls)], ensure_ascii=False)
+                    num_imgs = len(img_urls)
+                    cards_img = []
+                    modals_img = []
                     
-                    cards_img = "".join([
-                        f'''<div class="img-card" onclick="window.gtsOpenLb('{gallery_key}', {idx}, '{p_title}')">
+                    for idx, u in enumerate(img_urls):
+                        cur_modal_id = f"gts_lb_{grp}_{c_idx}_{idx}"
+                        prev_modal_id = f"gts_lb_{grp}_{c_idx}_{(idx - 1 + num_imgs) % num_imgs}"
+                        next_modal_id = f"gts_lb_{grp}_{c_idx}_{(idx + 1) % num_imgs}"
+                        
+                        # 缩略图卡片（点击触发原生 :target 锚点跳转）
+                        cards_img.append(f'''
+                        <a href="#{cur_modal_id}" class="img-card" title="点击放大预览">
                             <img src="{u}" referrerpolicy="no-referrer" alt="{p_title}统计图 {idx+1}">
-                        </div>''' 
-                        for idx, u in enumerate(img_urls)
-                    ])
-                    # 通过零高度图片注入当前卡片的图片组数据
-                    init_gal_script = f'<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:none;" onerror="window.gtsGalleries=window.gtsGalleries||{{}};window.gtsGalleries[\'{gallery_key}\']={gal_data};" />'
-                    img_tag_html = f'{init_gal_script}<div class="img-grid">{cards_img}</div>'
+                        </a>
+                        ''')
+                        
+                        # 原生纯 CSS Lightbox 弹窗结构（免 JS、零跨域报错）
+                        prev_btn_html = f'<a href="#{prev_modal_id}" class="gts-lb-arrow gts-lb-arrow-prev" title="上一张">‹</a>' if num_imgs > 1 else ''
+                        next_btn_html = f'<a href="#{next_modal_id}" class="gts-lb-arrow gts-lb-arrow-next" title="下一张">›</a>' if num_imgs > 1 else ''
+                        footer_cnt_html = f'<div class="gts-lb-footer">{idx + 1} / {num_imgs}</div>' if num_imgs > 1 else ''
+                        
+                        modals_img.append(f'''
+                        <div id="{cur_modal_id}" class="gts-lightbox-modal">
+                            <a href="#close" class="gts-lb-backdrop" title="点击背景退出"></a>
+                            <div class="gts-lb-header">
+                                <a href="#close" class="gts-lb-close-btn">✕ 退出</a>
+                                <div class="gts-lb-title">{p_title} · 统计图 ({idx + 1}/{num_imgs})</div>
+                                <div style="width: 72px;"></div>
+                            </div>
+                            {prev_btn_html}
+                            <div class="gts-lb-stage">
+                                <img class="gts-lb-img" src="{u}" alt="{p_title}统计图">
+                            </div>
+                            {next_btn_html}
+                            {footer_cnt_html}
+                        </div>
+                        ''')
+                    
+                    img_tag_html = f'<div class="img-grid">{"".join(cards_img)}</div>{"".join(modals_img)}'
 
                 grp_cards.append(f"""
                 <div class="card">
