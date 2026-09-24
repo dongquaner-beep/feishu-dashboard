@@ -1,9 +1,10 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import requests
 import pandas as pd
 import json
 import base64
+import hashlib
+import re
 
 # 1. 页面基本配置
 st.set_page_config(
@@ -84,7 +85,7 @@ GTS_LOGO_SVG = """
 </span>
 """
 
-# 3. 注入全局样式与多图自适应网格 CSS
+# 3. 注入全局样式与大屏 Lightbox 弹窗样式
 render_html(f"""
 <style>
 /* 全局微光渐变背景 */
@@ -519,63 +520,63 @@ div.st-key-floating_refresh_btn button p {{
     border: 1px solid #FCA5A5;
 }}
 
-/* ================= 核心：缩略图悬浮放大大图提示与智能网格 ================= */
+/* ================= 核心：缩略图智能双列与悬浮放大提示 ================= */
 .img-grid {{
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-    gap: 18px;
-    margin-top: 16px;
-    align-items: stretch;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important;
+    gap: 18px !important;
+    margin-top: 16px !important;
+    align-items: stretch !important;
 }}
 .img-card {{
-    background: #ffffff;
-    border-radius: 14px;
-    border: 1px solid #E2E8F0;
-    overflow: hidden;
-    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 12px;
+    background: #ffffff !important;
+    border-radius: 14px !important;
+    border: 1px solid #E2E8F0 !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04) !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 12px !important;
     position: relative !important;
     cursor: zoom-in !important;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }}
 .img-card:hover {{
-    transform: translateY(-2px);
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08) !important;
 }}
 .img-card::after {{
-    content: '🔍 点击放大预览';
-    position: absolute;
-    bottom: 14px;
-    right: 16px;
-    background: rgba(15, 23, 42, 0.78);
-    color: #ffffff;
-    font-size: 12px;
-    font-weight: 500;
-    padding: 4px 12px;
-    border-radius: 99px;
-    opacity: 0;
-    backdrop-filter: blur(6px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    transform: translateY(4px);
-    pointer-events: none;
+    content: '🔍 点击放大预览' !important;
+    position: absolute !important;
+    bottom: 14px !important;
+    right: 16px !important;
+    background: rgba(15, 23, 42, 0.78) !important;
+    color: #ffffff !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    padding: 4px 12px !important;
+    border-radius: 99px !important;
+    opacity: 0 !important;
+    backdrop-filter: blur(6px) !important;
+    transition: opacity 0.2s ease, transform 0.2s ease !important;
+    transform: translateY(4px) !important;
+    pointer-events: none !important;
 }}
 .img-card:hover::after {{
-    opacity: 1;
-    transform: translateY(0);
+    opacity: 1 !important;
+    transform: translateY(0) !important;
 }}
 .img-card img {{
-    width: 100%;
-    height: auto;
-    max-height: 520px;
-    object-fit: contain;
-    border-radius: 8px;
-    display: block;
+    width: 100% !important;
+    height: auto !important;
+    max-height: 500px !important;
+    object-fit: contain !important;
+    border-radius: 8px !important;
+    display: block !important;
 }}
 
-/* ================= 核心：大屏专属 Lightbox 模态弹窗样式 ================= */
+/* ================= 核心：原生大屏 Lightbox 弹窗样式（零跨域问题） ================= */
 #gts-lightbox-modal {{
     display: none;
     position: fixed !important;
@@ -583,20 +584,17 @@ div.st-key-floating_refresh_btn button p {{
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    background: rgba(15, 23, 42, 0.90) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
     backdrop-filter: blur(18px) !important;
     -webkit-backdrop-filter: blur(18px) !important;
     z-index: 2147483647 !important;
     align-items: center !important;
     justify-content: center !important;
     flex-direction: column !important;
-    opacity: 0;
-    transition: opacity 0.22s ease !important;
     user-select: none !important;
 }}
 #gts-lightbox-modal.active {{
     display: flex !important;
-    opacity: 1 !important;
 }}
 
 .gts-lb-header {{
@@ -610,8 +608,8 @@ div.st-key-floating_refresh_btn button p {{
     z-index: 100 !important;
 }}
 .gts-lb-close-btn {{
-    background: rgba(255, 255, 255, 0.15) !important;
-    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    background: rgba(255, 255, 255, 0.16) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
     color: #ffffff !important;
     border-radius: 99px !important;
     padding: 7px 18px !important;
@@ -710,6 +708,104 @@ div.st-key-floating_refresh_btn button p {{
 .ct0 {{ border-bottom: 0 !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }}
 .mt12 {{ margin-top: 10px; }}
 </style>
+""")
+
+# ================= 核心：主 DOM 弹窗容器与原生 JS 逻辑驱动（零跨域阻断） =================
+render_html("""
+<div id="gts-lightbox-modal">
+    <div class="gts-lb-header">
+        <button class="gts-lb-close-btn" onclick="window.gtsCloseLb()">✕ 退出</button>
+        <div class="gts-lb-title" id="gts-lb-title">图片大屏预览</div>
+        <div style="width: 72px;"></div>
+    </div>
+    <div class="gts-lb-arrow gts-lb-arrow-prev" id="gts-lb-prev" onclick="window.gtsPrevLb()" title="上一张 (←)">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </div>
+    <div class="gts-lb-stage" id="gts-lb-stage" onclick="if(event.target===this)window.gtsCloseLb()">
+        <img class="gts-lb-img" id="gts-lb-img" src="" alt="预览大图">
+    </div>
+    <div class="gts-lb-arrow gts-lb-arrow-next" id="gts-lb-next" onclick="window.gtsNextLb()" title="下一张 (→)">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </div>
+    <div class="gts-lb-footer" id="gts-lb-footer">
+        <span id="gts-lb-counter">1 / 1</span>
+    </div>
+</div>
+
+<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:none;" onerror="
+(function(){
+    window.gtsGalleries = window.gtsGalleries || {};
+    window.gtsCurGal = [];
+    window.gtsCurIdx = 0;
+    window.gtsCurTitle = '';
+
+    window.gtsOpenLb = function(galKey, idx, title) {
+        var gal = window.gtsGalleries[galKey] || [];
+        if(!gal || gal.length === 0) return;
+        window.gtsCurGal = gal;
+        window.gtsCurIdx = idx || 0;
+        window.gtsCurTitle = title || '';
+        window.gtsRenderLb();
+        var m = document.getElementById('gts-lightbox-modal');
+        if(m) m.classList.add('active');
+    };
+
+    window.gtsCloseLb = function() {
+        var m = document.getElementById('gts-lightbox-modal');
+        if(m) m.classList.remove('active');
+        var img = document.getElementById('gts-lb-img');
+        if(img) img.src = '';
+    };
+
+    window.gtsPrevLb = function() {
+        if(!window.gtsCurGal || window.gtsCurGal.length <= 1) return;
+        window.gtsCurIdx = (window.gtsCurIdx - 1 + window.gtsCurGal.length) % window.gtsCurGal.length;
+        window.gtsRenderLb();
+    };
+
+    window.gtsNextLb = function() {
+        if(!window.gtsCurGal || window.gtsCurGal.length <= 1) return;
+        window.gtsCurIdx = (window.gtsCurIdx + 1) % window.gtsCurGal.length;
+        window.gtsRenderLb();
+    };
+
+    window.gtsRenderLb = function() {
+        var item = window.gtsCurGal[window.gtsCurIdx];
+        if(!item) return;
+        var img = document.getElementById('gts-lb-img');
+        var titleEl = document.getElementById('gts-lb-title');
+        var counterEl = document.getElementById('gts-lb-counter');
+        var prevBtn = document.getElementById('gts-lb-prev');
+        var nextBtn = document.getElementById('gts-lb-next');
+
+        if(img) {
+            img.style.opacity = '0';
+            img.style.transform = 'scale(0.97)';
+            setTimeout(function() {
+                img.src = item.src;
+                img.style.opacity = '1';
+                img.style.transform = 'scale(1)';
+            }, 60);
+        }
+        if(titleEl) titleEl.textContent = item.title || window.gtsCurTitle;
+        if(counterEl) counterEl.textContent = (window.gtsCurIdx + 1) + ' / ' + window.gtsCurGal.length;
+
+        if(prevBtn) prevBtn.style.display = (window.gtsCurGal.length <= 1) ? 'none' : 'flex';
+        if(nextBtn) nextBtn.style.display = (window.gtsCurGal.length <= 1) ? 'none' : 'flex';
+    };
+
+    if(!window._gtsKeyBound) {
+        document.addEventListener('keydown', function(e) {
+            var m = document.getElementById('gts-lightbox-modal');
+            if(!m || !m.classList.contains('active')) return;
+            if(e.key === 'Escape') window.gtsCloseLb();
+            else if(e.key === 'ArrowLeft') window.gtsPrevLb();
+            else if(e.key === 'ArrowRight') window.gtsNextLb();
+        });
+        window._gtsKeyBound = true;
+    }
+})();
+" />
 """)
 
 # 4. 原生零报错防 nan 函数
@@ -819,11 +915,11 @@ def get_feishu_token():
         pass
     return ""
 
-# 智能转换 Base64 图片
+# 智能转换 Base64 图片（返回 Base64 字符串与二进制 MD5）
 @st.cache_data(ttl=3600)
-def to_base64_image(img_url, token=""):
+def fetch_base64_and_md5(img_url, token=""):
     if not img_url or not str(img_url).startswith("http"):
-        return img_url
+        return "", ""
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
         if token:
@@ -839,102 +935,81 @@ def to_base64_image(img_url, token=""):
                         real_url = tmp_urls[0]["tmp_download_url"]
                         r2 = requests.get(real_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
                         if r2.status_code == 200 and len(r2.content) > 100:
+                            content_md5 = hashlib.md5(r2.content).hexdigest()
                             b64 = base64.b64encode(r2.content).decode("utf-8")
                             ctype2 = r2.headers.get("Content-Type", "image/png")
-                            return f"data:{ctype2};base64,{b64}"
+                            return f"data:{ctype2};base64,{b64}", content_md5
                 except Exception:
                     pass
             else:
+                content_md5 = hashlib.md5(res.content).hexdigest()
                 b64 = base64.b64encode(res.content).decode("utf-8")
-                return f"data:{ctype};base64,{b64}"
+                return f"data:{ctype};base64,{b64}", content_md5
     except Exception:
         pass
-    return img_url
+    return "", ""
 
-# ================= 核心修复：四重严密去重机制（过滤重复上传的相同图片） =================
+# ================= 核心修复：基于二进制 MD5 指纹的绝对精准去重 =================
 def extract_image_urls(row, token=""):
     raw_fields = row.get("_raw_fields") if isinstance(row, dict) else (row["_raw_fields"] if "_raw_fields" in row else {})
     if not isinstance(raw_fields, dict):
         raw_fields = {}
         
-    candidate_cols = ["统计图-图片", "统计图", "图片", "图表", "附件"]
     target_raw_val = None
-    
-    # 严格匹配“统计图-图片”列
-    for cand in candidate_cols:
+    if "统计图-图片" in raw_fields and raw_fields["统计图-图片"]:
+        target_raw_val = raw_fields["统计图-图片"]
+    else:
         for k, v in raw_fields.items():
-            if cand in str(k) and v:
+            if "统计图-图片" in str(k) and v:
                 target_raw_val = v
                 break
-        if target_raw_val:
-            break
-            
-    urls = []
-    seen_names = set()
-    seen_tokens = set()
-    seen_urls = set()
-    
+                
+    if not target_raw_val:
+        for cand in ["统计图", "图片", "图表"]:
+            for k, v in raw_fields.items():
+                if cand in str(k) and v:
+                    target_raw_val = v
+                    break
+            if target_raw_val:
+                break
+                
+    raw_urls = []
     if isinstance(target_raw_val, list):
         for item in target_raw_val:
             if isinstance(item, dict):
-                # 1. 第一重排重：按文件名去重（ScreenShot_..._467.png 即使上传 3 次也只取第 1 次）
-                fname = item.get("name")
-                ftoken = item.get("file_token")
-                if fname:
-                    clean_fn = str(fname).strip().lower()
-                    if clean_fn in seen_names:
-                        continue
-                    seen_names.add(clean_fn)
-                # 2. 第二重排重：按 file_token 去重
-                if ftoken:
-                    clean_ft = str(ftoken).strip()
-                    if clean_ft in seen_tokens:
-                        continue
-                    seen_tokens.add(clean_ft)
-                    
-                u = item.get("url") or item.get("tmp_url") or item.get("download_url")
+                u = item.get("tmp_url") or item.get("url") or item.get("download_url") or ""
+                ftoken = str(item.get("file_token") or item.get("token") or "").strip()
+                if "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" in str(u) or "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" in ftoken:
+                    continue
                 if not u and ftoken:
                     u = f"https://open.feishu.cn/open-apis/drive/v1/medias/{ftoken}/download"
                 if u and str(u).startswith("http"):
-                    clean_u = str(u).strip()
-                    if clean_u not in seen_urls:
-                        seen_urls.add(clean_u)
-                        urls.append(clean_u)
+                    raw_urls.append(str(u).strip())
             elif isinstance(item, str) and item.startswith("http"):
-                clean_u = item.strip()
-                if clean_u not in seen_urls:
-                    seen_urls.add(clean_u)
-                    urls.append(clean_u)
+                u_str = item.strip()
+                if "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" not in u_str:
+                    raw_urls.append(u_str)
     elif isinstance(target_raw_val, str) and target_raw_val.startswith("http"):
-        clean_u = target_raw_val.strip()
-        if clean_u not in seen_urls:
-            seen_urls.add(clean_u)
-            urls.append(clean_u)
-        
-    if not urls:
-        for cand in candidate_cols:
-            col_name = find_column(pd.DataFrame([row]), [cand])
-            if col_name and col_name in row and row[col_name]:
-                val_str = str(row[col_name]).strip()
-                for part in val_str.split(" / "):
-                    part = part.strip()
-                    if (part.startswith("http://") or part.startswith("https://")) and part not in seen_urls:
-                        seen_urls.add(part)
-                        urls.append(part)
-                        
-    # 3. 第三重/第四重排重：按 Base64 数据内容指纹排重（确保绝对零重复图片）
-    b64_urls = []
-    seen_hashes = set()
-    for u in urls:
-        b64 = to_base64_image(u, token)
-        if b64:
-            # 提取头尾与长度作为高灵敏度指纹
-            img_fingerprint = f"{len(b64)}_{b64[:120]}_{b64[-120:]}"
-            if img_fingerprint not in seen_hashes:
-                seen_hashes.add(img_fingerprint)
-                b64_urls.append(b64)
+        u_str = target_raw_val.strip()
+        if "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" not in u_str:
+            raw_urls.append(u_str)
             
-    return b64_urls
+    # 核心：通过图片真实二进制内容 MD5 进行绝对去重
+    b64_list = []
+    seen_md5 = set()
+    for u in raw_urls:
+        b64_str, f_md5 = fetch_base64_and_md5(u, token)
+        if b64_str and f_md5:
+            if f_md5 in seen_md5:
+                continue
+            seen_md5.add(f_md5)
+            b64_list.append(b64_str)
+            
+    # 如果依然超过 2 张（比如手动截图了相同页面但尺寸微差），保留最新的前 2 张
+    if len(b64_list) > 2:
+        b64_list = b64_list[:2]
+        
+    return b64_list
 
 def fetch_feishu_view(table_id, view_id=None):
     token = get_feishu_token()
@@ -1122,152 +1197,6 @@ if st.button("🔄 刷新数据", key="floating_refresh_btn"):
         del st.session_state["data_hub"]
     st.rerun()
 
-# ==================== 核心：全屏 Lightbox 大图预览脚本驱动 ====================
-components.html("""
-<script>
-function setupGtsLightbox() {
-    try {
-        const doc = window.parent.document;
-        if (!doc) return;
-
-        let modal = doc.getElementById('gts-lightbox-modal');
-        if (!modal) {
-            modal = doc.createElement('div');
-            modal.id = 'gts-lightbox-modal';
-            modal.innerHTML = `
-                <div class="gts-lb-header">
-                    <button class="gts-lb-close-btn" id="gts-lb-close">✕ 退出</button>
-                    <div class="gts-lb-title" id="gts-lb-title">图片大屏预览</div>
-                    <div style="width: 72px;"></div>
-                </div>
-                <div class="gts-lb-arrow gts-lb-arrow-prev" id="gts-lb-prev" title="上一张 (←)">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                </div>
-                <div class="gts-lb-stage" id="gts-lb-stage">
-                    <img class="gts-lb-img" id="gts-lb-img" src="" alt="预览大图">
-                </div>
-                <div class="gts-lb-arrow gts-lb-arrow-next" id="gts-lb-next" title="下一张 (→)">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                </div>
-                <div class="gts-lb-footer" id="gts-lb-footer">
-                    <span id="gts-lb-counter">1 / 1</span>
-                </div>
-            `;
-            doc.body.appendChild(modal);
-        }
-
-        let currentGallery = [];
-        let currentIndex = 0;
-        let currentTitle = "";
-
-        const imgEl = doc.getElementById('gts-lb-img');
-        const titleEl = doc.getElementById('gts-lb-title');
-        const counterEl = doc.getElementById('gts-lb-counter');
-        const prevBtn = doc.getElementById('gts-lb-prev');
-        const nextBtn = doc.getElementById('gts-lb-next');
-        const closeBtn = doc.getElementById('gts-lb-close');
-        const stageEl = doc.getElementById('gts-lb-stage');
-
-        function renderCurrentImage() {
-            if (!currentGallery || currentGallery.length === 0) return;
-            const item = currentGallery[currentIndex];
-            imgEl.style.opacity = '0';
-            imgEl.style.transform = 'scale(0.97)';
-            setTimeout(() => {
-                imgEl.src = item.src;
-                imgEl.alt = item.title || currentTitle;
-                imgEl.style.opacity = '1';
-                imgEl.style.transform = 'scale(1)';
-            }, 80);
-
-            titleEl.textContent = item.title || currentTitle;
-            counterEl.textContent = `${currentIndex + 1} / ${currentGallery.length}`;
-
-            if (currentGallery.length <= 1) {
-                prevBtn.style.display = 'none';
-                nextBtn.style.display = 'none';
-            } else {
-                prevBtn.style.display = 'flex';
-                nextBtn.style.display = 'flex';
-            }
-        }
-
-        function openModal(gallery, index, title) {
-            currentGallery = gallery;
-            currentIndex = index;
-            currentTitle = title;
-            renderCurrentImage();
-            modal.classList.add('active');
-        }
-
-        function closeModal() {
-            modal.classList.remove('active');
-            imgEl.src = '';
-        }
-
-        function showPrev() {
-            if (currentGallery.length <= 1) return;
-            currentIndex = (currentIndex - 1 + currentGallery.length) % currentGallery.length;
-            renderCurrentImage();
-        }
-
-        function showNext() {
-            if (currentGallery.length <= 1) return;
-            currentIndex = (currentIndex + 1) % currentGallery.length;
-            renderCurrentImage();
-        }
-
-        if (!modal._eventsBound) {
-            closeBtn.onclick = closeModal;
-            prevBtn.onclick = (e) => { e.stopPropagation(); showPrev(); };
-            nextBtn.onclick = (e) => { e.stopPropagation(); showNext(); };
-            stageEl.onclick = (e) => { if (e.target === stageEl) closeModal(); };
-            modal.onclick = (e) => { if (e.target === modal) closeModal(); };
-
-            doc.addEventListener('keydown', (e) => {
-                if (!modal.classList.contains('active')) return;
-                if (e.key === 'Escape') closeModal();
-                else if (e.key === 'ArrowLeft') showPrev();
-                else if (e.key === 'ArrowRight') showNext();
-            });
-            modal._eventsBound = true;
-        }
-
-        if (!doc._gtsImgClickBound) {
-            doc.body.addEventListener('click', (e) => {
-                const target = e.target.closest('.lightbox-trigger');
-                if (!target) return;
-                e.preventDefault();
-                e.stopPropagation();
-
-                const galleryId = target.getAttribute('data-gallery');
-                const targetIndex = parseInt(target.getAttribute('data-index') || '0', 10);
-                const title = target.getAttribute('data-title') || '统计图预览';
-
-                let allImgs = [];
-                if (galleryId) {
-                    const groupElements = doc.querySelectorAll(`.lightbox-trigger[data-gallery="${galleryId}"]`);
-                    groupElements.forEach((el, idx) => {
-                        allImgs.push({
-                            src: el.getAttribute('src'),
-                            title: el.getAttribute('data-title') || `${title} (${idx+1})`
-                        });
-                    });
-                } else {
-                    allImgs = [{ src: target.getAttribute('src'), title: title }];
-                }
-
-                openModal(allImgs, targetIndex, title);
-            });
-            doc._gtsImgClickBound = true;
-        }
-    } catch(e) {}
-}
-setTimeout(setupGtsLightbox, 300);
-setTimeout(setupGtsLightbox, 1200);
-</script>
-""", height=0, width=0)
-
 # ==================== Tab 1：交付中项目 ====================
 if current_tab_id == "delivery":
     df_del = DATA_HUB["delivery"]
@@ -1422,7 +1351,7 @@ elif current_tab_id == "finish":
         fin_cards.append('</div>')
         render_html("\n".join(fin_cards))
 
-# ==================== Tab 4：其他事项汇总（双图并排 + 排重保护） ====================
+# ==================== Tab 4：其他事项汇总（原生大图预览 + 精准 2 图显示） ====================
 elif current_tab_id == "other":
     df_dev_all = DATA_HUB["dev_all"]
     df_non_del = DATA_HUB["non_del"]
@@ -1435,7 +1364,7 @@ elif current_tab_id == "other":
     col_dev_cat = find_column(df_dev_all, ["分类", "类别"])
     col_dev_cur = find_column(df_dev_all, ["本周进度与建设情况", "本周进度", "建设情况"])
     col_dev_next = find_column(df_dev_all, ["下周工作计划", "下周计划", "工作计划"])
-    col_dev_group = find_column(df_dev_all, ["负责小组", "小组", "部门", "负责部门", "团队", "组别"])
+    col_dev_group = find_column(df_dev_all, ["负责小组", "小组", "部门", "组别", "团队"])
 
     groups_order = ["客户服务组", "IT组", "交付研发一组", "数据处理组", "交付研发二组"]
 
@@ -1516,24 +1445,22 @@ elif current_tab_id == "other":
                 cur_prog = fmt_txt(drow.get(col_dev_cur))
                 next_plan = fmt_txt(drow.get(col_dev_next))
                 
-                # 动态获取飞书多维表格图片（四重严密去重）
+                # 严格提取并去重
                 img_urls = extract_image_urls(drow, current_feishu_token)
                 img_tag_html = ""
                 if img_urls:
                     gallery_key = f"gal_{grp}_{c_idx}"
+                    gal_data = json.dumps([{"src": u, "title": f"{p_title} ({idx+1}/{len(img_urls)})"} for idx, u in enumerate(img_urls)], ensure_ascii=False)
+                    
                     cards_img = "".join([
-                        f'''<div class="img-card">
-                            <img src="{u}" 
-                                 class="lightbox-trigger" 
-                                 data-gallery="{gallery_key}" 
-                                 data-index="{idx}" 
-                                 data-title="{p_title} ({idx+1}/{len(img_urls)})" 
-                                 referrerpolicy="no-referrer" 
-                                 alt="{p_title}统计图 {idx+1}">
+                        f'''<div class="img-card" onclick="window.gtsOpenLb('{gallery_key}', {idx}, '{p_title}')">
+                            <img src="{u}" referrerpolicy="no-referrer" alt="{p_title}统计图 {idx+1}">
                         </div>''' 
                         for idx, u in enumerate(img_urls)
                     ])
-                    img_tag_html = f'<div class="img-grid">{cards_img}</div>'
+                    # 通过零高度图片注入当前卡片的图片组数据
+                    init_gal_script = f'<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:none;" onerror="window.gtsGalleries=window.gtsGalleries||{{}};window.gtsGalleries[\'{gallery_key}\']={gal_data};" />'
+                    img_tag_html = f'{init_gal_script}<div class="img-grid">{cards_img}</div>'
 
                 grp_cards.append(f"""
                 <div class="card">
