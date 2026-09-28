@@ -86,10 +86,14 @@ GTS_LOGO_SVG = """
 </span>
 """
 
-# 3. 注入全局样式与原生 Pure-CSS Lightbox 样式
+# 3. 注入全局样式与无溢出纯 CSS 原生大屏 Lightbox 样式
 render_html(f"""
 <style>
-/* 全局微光渐变背景 */
+/* 全局微光渐变背景，彻底禁止页面横向滚动 */
+html, body, .stApp, [data-testid="stMain"] {{
+    overflow-x: hidden !important;
+}}
+
 .stApp {{
     background: radial-gradient(60% 52% at 12% 8%,rgba(99,102,241,.14),transparent 70%),
                 radial-gradient(55% 46% at 90% 6%,rgba(56,189,248,.13),transparent 70%),
@@ -579,35 +583,42 @@ a.img-card img {{
     display: block !important;
 }}
 
-/* ================= 核心：原生纯 CSS3 `:target` 全屏预览大图（无需 JS，100% 绝不失效） ================= */
+/* ================= 核心修复：纯 CSS3 `:target` 全屏无溢出大图弹窗 ================= */
 .gts-lightbox-modal {{
     display: none;
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
     background: rgba(15, 23, 42, 0.94) !important;
-    backdrop-filter: blur(18px) !important;
-    -webkit-backdrop-filter: blur(18px) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
     z-index: 2147483647 !important;
     align-items: center !important;
     justify-content: center !important;
     flex-direction: column !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
     user-select: none !important;
 }}
-/* 当点击任意缩略图时，CSS 原生触发 :target 激活全屏大图 */
 .gts-lightbox-modal:target {{
     display: flex !important;
 }}
 
-/* 点击背景任意空白处直接关闭 */
+/* 点击背景任意空白处直接关闭退出 */
 .gts-lb-backdrop {{
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
     z-index: 10 !important;
     cursor: zoom-out !important;
     text-decoration: none !important;
@@ -616,13 +627,13 @@ a.img-card img {{
 /* 顶部操作条（退出按钮 + 标题） */
 .gts-lb-header {{
     position: absolute !important;
-    top: 20px !important;
-    left: 28px !important;
-    right: 28px !important;
+    top: 18px !important;
+    left: 24px !important;
+    right: 24px !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
-    z-index: 20 !important;
+    z-index: 25 !important;
     pointer-events: none !important;
 }}
 .gts-lb-close-btn {{
@@ -660,7 +671,7 @@ a.img-card img {{
     pointer-events: auto !important;
 }}
 
-/* 图片主舞台 */
+/* 核心修复：缩小大图尺寸，留足呼吸间距，不遮挡任何翻页按钮 */
 .gts-lb-stage {{
     position: relative !important;
     width: 100% !important;
@@ -668,29 +679,31 @@ a.img-card img {{
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 70px 90px 60px 90px !important;
+    padding: 60px 80px !important;
     box-sizing: border-box !important;
     z-index: 15 !important;
     pointer-events: none !important;
 }}
 .gts-lb-img {{
-    max-width: 88vw !important;
-    max-height: 82vh !important;
+    max-width: min(650px, 68%) !important;
+    max-height: 72vh !important;
+    width: auto !important;
+    height: auto !important;
     object-fit: contain !important;
     border-radius: 12px !important;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75) !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65) !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important;
     background: #ffffff !important;
     pointer-events: auto !important;
 }}
 
-/* 左右翻页圆形白钮（对标飞书查看器交互） */
+/* 核心修复：左右翻页白圆钮绝对定位在屏幕内侧，100% 绝不溢出 */
 .gts-lb-arrow {{
     position: absolute !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
-    width: 52px !important;
-    height: 52px !important;
+    width: 48px !important;
+    height: 48px !important;
     border-radius: 50% !important;
     background: rgba(255, 255, 255, 0.95) !important;
     border: 1px solid #E2E8F0 !important;
@@ -698,28 +711,28 @@ a.img-card img {{
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 32px !important;
+    font-size: 30px !important;
     font-weight: 300 !important;
     line-height: 1 !important;
     cursor: pointer !important;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    z-index: 20 !important;
+    z-index: 25 !important;
     text-decoration: none !important;
 }}
 .gts-lb-arrow:hover {{
     background: #4F46E5 !important;
     color: #ffffff !important;
-    transform: translateY(-50%) scale(1.1) !important;
-    box-shadow: 0 12px 32px rgba(79, 70, 229, 0.5) !important;
+    transform: translateY(-50%) scale(1.08) !important;
+    box-shadow: 0 10px 28px rgba(79, 70, 229, 0.45) !important;
 }}
-.gts-lb-arrow-prev {{ left: 32px !important; }}
-.gts-lb-arrow-next {{ right: 32px !important; }}
+.gts-lb-arrow-prev {{ left: 24px !important; }}
+.gts-lb-arrow-next {{ right: 24px !important; }}
 
 /* 底部页码指示器 */
 .gts-lb-footer {{
     position: absolute !important;
-    bottom: 24px !important;
+    bottom: 22px !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
     background: rgba(255, 255, 255, 0.2) !important;
@@ -730,7 +743,7 @@ a.img-card img {{
     font-size: 13.5px !important;
     font-weight: 600 !important;
     backdrop-filter: blur(10px) !important;
-    z-index: 20 !important;
+    z-index: 25 !important;
     pointer-events: none !important;
 }}
 
@@ -883,7 +896,7 @@ def fetch_base64_and_md5(img_url, token=""):
         pass
     return "", ""
 
-# ================= 核心修复：前置特征去重 + MD5 指纹绝对排重 =================
+# 前置特征去重 + MD5 指纹绝对排重，锁定真实的 2 张图
 def extract_image_urls(row, token=""):
     raw_fields = row.get("_raw_fields") if isinstance(row, dict) else (row["_raw_fields"] if "_raw_fields" in row else {})
     if not isinstance(raw_fields, dict):
@@ -917,11 +930,9 @@ def extract_image_urls(row, token=""):
                 ftoken = str(item.get("file_token") or item.get("token") or "").strip()
                 name = str(item.get("name") or item.get("file_name") or "").strip().lower()
                 
-                # 剔除历史旧测试 Token
                 if "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" in str(u) or "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" in ftoken:
                     continue
                     
-                # 1. 前置特征过滤：去除文件名中的副本标记，相同文件直接排重
                 norm_name = re.sub(r'[\s_]*\(\d+\)', '', name)
                 norm_name = re.sub(r'[\s_]*副本', '', norm_name)
                 unique_key = norm_name if norm_name else ftoken
@@ -943,7 +954,6 @@ def extract_image_urls(row, token=""):
         if "Qt6pbnTeNo3Y9DxuERlcPPAZnIh" not in u_str:
             raw_urls.append(u_str)
             
-    # 2. 二进制 MD5 真实图像指纹排重
     b64_list = []
     seen_md5 = set()
     for u in raw_urls:
@@ -954,7 +964,6 @@ def extract_image_urls(row, token=""):
             seen_md5.add(f_md5)
             b64_list.append(b64_str)
             
-    # 确保只保留多维表格中真实的 2 张独立图表
     if len(b64_list) > 2:
         b64_list = b64_list[:2]
         
@@ -1404,18 +1413,16 @@ elif current_tab_id == "other":
                     modals_img = []
                     
                     for idx, u in enumerate(img_urls):
-                        cur_modal_id = f"gts_lb_{grp}_{c_idx}_{idx}"
-                        prev_modal_id = f"gts_lb_{grp}_{c_idx}_{(idx - 1 + num_imgs) % num_imgs}"
-                        next_modal_id = f"gts_lb_{grp}_{c_idx}_{(idx + 1) % num_imgs}"
+                        cur_modal_id = f"gts_lb_{c_idx}_{idx}"
+                        prev_modal_id = f"gts_lb_{c_idx}_{(idx - 1 + num_imgs) % num_imgs}"
+                        next_modal_id = f"gts_lb_{c_idx}_{(idx + 1) % num_imgs}"
                         
-                        # 缩略图卡片（点击触发原生 :target 锚点跳转）
                         cards_img.append(f'''
                         <a href="#{cur_modal_id}" class="img-card" title="点击放大预览">
                             <img src="{u}" referrerpolicy="no-referrer" alt="{p_title}统计图 {idx+1}">
                         </a>
                         ''')
                         
-                        # 原生纯 CSS Lightbox 弹窗结构（免 JS、零跨域报错）
                         prev_btn_html = f'<a href="#{prev_modal_id}" class="gts-lb-arrow gts-lb-arrow-prev" title="上一张">‹</a>' if num_imgs > 1 else ''
                         next_btn_html = f'<a href="#{next_modal_id}" class="gts-lb-arrow gts-lb-arrow-next" title="下一张">›</a>' if num_imgs > 1 else ''
                         footer_cnt_html = f'<div class="gts-lb-footer">{idx + 1} / {num_imgs}</div>' if num_imgs > 1 else ''
